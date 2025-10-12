@@ -1,0 +1,66 @@
+//@version=6
+strategy(title="매일 적립식 매수 전략 (수정본)",
+         overlay=true,
+         initial_capital=200000,
+         commission_value=0.075,
+         default_qty_type=strategy.fixed,
+         default_qty_value=1,
+         pyramiding=1000)
+
+// --- 백테스트 기간 설정 입력 (사용자가 설정 가능) ---
+i_startTime = input.time(timestamp("2024-10-11T00:00:00"), title="시작 날짜", group="기간 설정")
+i_sellTime   = input.time(timestamp("2025-10-08T23:59:59"), title="매도 시작 날짜", group="기간 설정")
+
+// --- 매수 조건 설정 ---
+i_buyCondition = input.string("최근 5일 최저가", title="매수 조건 선택", options=["최근 5일 최저가", "최근 5일 최고가"], group="매수 조건")
+isLowest = low == ta.lowest(low, 5)
+isHighest = high == ta.highest(high, 5)
+
+// 매수는 매도 시작 전까지만 실행
+isWithinBuyRange = time >= i_startTime and time < i_sellTime
+
+// --- 매수 및 매도 로직 ---
+var float cost_basis_before_close = na
+var float final_position_size = na
+var bool final_exit_initiated = false
+
+// 1. 선택된 매수 조건에 따라 매수 실행
+bool buySignal = false
+if (i_buyCondition == "최근 5일 최저가")
+    buySignal := isLowest
+else if (i_buyCondition == "최근 5일 최고가")
+    buySignal := isHighest
+
+if (isWithinBuyRange and buySignal)
+    strategy.entry("Buy", strategy.long)
+
+// 2. 매도 시작 시간에 단 한 번만 실행하여 값 기록 및 포지션 종료
+if (time >= i_sellTime and not final_exit_initiated)
+    cost_basis_before_close := strategy.position_avg_price * strategy.position_size
+    final_position_size := strategy.position_size
+    strategy.close_all(comment="백테스트 종료 매도")
+    final_exit_initiated := true // 실행되었음을 기록
+
+// --- 최종 결과 테이블 표시 ---
+var table results_table = table.new(position.bottom_right, 2, 4, border_width=1)
+if (barstate.islast)
+    // 수익률 계산
+    float roi = 0.0
+    if (cost_basis_before_close > 0)
+        roi := (strategy.netprofit / cost_basis_before_close) * 100
+
+    // 헤더
+    table.cell(results_table, 0, 0, "항목", bgcolor=color.new(color.gray, 80), text_color=color.white)
+    table.cell(results_table, 1, 0, "금액", bgcolor=color.new(color.gray, 80), text_color=color.white)
+    
+    // 총 투자 원금 (청산 직전 기준)
+    table.cell(results_table, 0, 1, "총 투자 원금")
+    table.cell(results_table, 1, 1, str.tostring(cost_basis_before_close, "#,###.00"))
+    
+    // 최종 순수익
+    table.cell(results_table, 0, 2, "최종 순수익 (Net Profit)")
+    table.cell(results_table, 1, 2, str.tostring(strategy.netprofit, "#,###.00"))
+
+    // 수익률 (%)
+    table.cell(results_table, 0, 3, "수익률 (%)")
+    table.cell(results_table, 1, 3, str.tostring(roi, "0.00") + "%")
