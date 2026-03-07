@@ -41,10 +41,8 @@ import {
   formatDateTime,
   formatPercent,
   getLatestCommonDate,
-  getOverlapAnchorDate,
   maxExistingDate,
   minExistingDate,
-  normalizeAgainstDate,
   PERIODS,
   PeriodId,
   subtractMonthsKey,
@@ -80,10 +78,6 @@ export function RollingComparison({
   );
   const latestCommonDate = useMemo(
     () => (tickerData ? getLatestCommonDate(tickerData) : null),
-    [tickerData]
-  );
-  const overlapAnchorDate = useMemo(
-    () => (tickerData ? getOverlapAnchorDate(tickerData) : null),
     [tickerData]
   );
   const initialVisibleFrom = useMemo(
@@ -196,7 +190,6 @@ export function RollingComparison({
     if (
       !tickerData ||
       !latestCommonDate ||
-      !overlapAnchorDate ||
       !initialVisibleFrom ||
       !navigatorContainerRef.current ||
       !detailContainerRef.current
@@ -235,12 +228,8 @@ export function RollingComparison({
       lastValueVisible: true,
     });
 
-    navigatorQqq.setData(
-      normalizeAgainstDate(tickerData.QQQ.rows, overlapAnchorDate) as LineData<Time>[]
-    );
-    navigatorTqqq.setData(
-      normalizeAgainstDate(tickerData.TQQQ.rows, overlapAnchorDate) as LineData<Time>[]
-    );
+    navigatorQqq.setData(tickerData.QQQ.rows as LineData<Time>[]);
+    navigatorTqqq.setData(tickerData.TQQQ.rows as LineData<Time>[]);
 
     navigatorChartRef.current = navigatorChart;
     detailChartRef.current = detailChart;
@@ -290,7 +279,6 @@ export function RollingComparison({
   }, [
     initialVisibleFrom,
     latestCommonDate,
-    overlapAnchorDate,
     tickerData,
   ]);
 
@@ -369,8 +357,9 @@ export function RollingComparison({
               위 차트는 TradingView의 공식 차트 라이브러리인 Lightweight
               Charts로 구성했습니다. 상단 히스토리 차트를 좌우로 드래그하면
               기준 시점이 바뀌고, 아래의 trailing 수익률 비교가 즉시 다시
-              계산됩니다. 상단 네비게이터는 QQQ와 TQQQ를 모두 TQQQ 상장일
-              종가=100으로 정규화한 누적 상대지수입니다.
+              계산됩니다. 상단 네비게이터는 QQQ와 TQQQ의 장기 가격 흐름을
+              그대로 보여주고, 하단 차트에서만 trailing 수익률 비교를
+              계산합니다.
             </CardDescription>
             <div className="flex flex-wrap gap-2.5">
               <Pill label="QQQ" color={COLORS.QQQ} />
@@ -404,7 +393,7 @@ export function RollingComparison({
           <SummaryCard
             label="데이터 범위"
             value={`${tickerData.QQQ.firstDate} ~ ${latestCommonDate}`}
-            detail={`상단 네비게이터는 ${tickerData.TQQQ.firstDate} 기준 QQQ/TQQQ를 모두 100으로 맞춥니다.`}
+            detail={`TQQQ 데이터 시작일은 ${tickerData.TQQQ.firstDate}입니다. 그 이전 구간은 TQQQ가 비어 있습니다.`}
           />
           <SummaryCard
             label="마지막 갱신"
@@ -420,8 +409,8 @@ export function RollingComparison({
                 전체 히스토리 네비게이터
               </CardTitle>
               <CardDescription className="max-w-4xl text-[15px] leading-6 text-[var(--muted)]">
-                QQQ와 TQQQ를 모두 TQQQ 상장일 종가=100으로 맞춘 누적 상대지수입니다.
-                이 차트를 좌우로 움직이면 아래의 기간별 비교 기준일이 바뀝니다.
+                QQQ와 TQQQ의 장기 가격 흐름입니다. 이 차트를 좌우로 움직이면
+                아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
             </div>
             <div className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-white/78 px-3 py-2 text-sm font-medium text-[var(--text)]">
