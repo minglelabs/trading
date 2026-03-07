@@ -166,6 +166,10 @@ export function RollingComparison({
   });
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<PeriodId>("6m");
+  const [historyTrailingPeriodId, setHistoryTrailingPeriodId] =
+    useState<PeriodId>("6m");
+  const [historyForwardPeriodId, setHistoryForwardPeriodId] =
+    useState<PeriodId>("6m");
   const [navigatorScaleMode, setNavigatorScaleMode] =
     useState<ScaleMode>("log");
   const [anchorDate, setAnchorDate] = useState<string | null>(latestCommonDate);
@@ -175,6 +179,16 @@ export function RollingComparison({
   const selectedPeriod = useMemo(
     () => PERIODS.find((period) => period.id === selectedPeriodId) ?? PERIODS[3],
     [selectedPeriodId]
+  );
+  const historyTrailingPeriod = useMemo(
+    () =>
+      PERIODS.find((period) => period.id === historyTrailingPeriodId) ?? PERIODS[2],
+    [historyTrailingPeriodId]
+  );
+  const historyForwardPeriod = useMemo(
+    () =>
+      PERIODS.find((period) => period.id === historyForwardPeriodId) ?? PERIODS[2],
+    [historyForwardPeriodId]
   );
 
   const periodReturns = useMemo(() => {
@@ -273,6 +287,52 @@ export function RollingComparison({
       "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
     );
   }, [qqqForwardWindow, tqqqForwardWindow]);
+  const historyTrailingStatus = useMemo(() => {
+    if (!tickerData || !anchorDate) {
+      return buildComparisonStatus(
+        null,
+        null,
+        "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다."
+      );
+    }
+
+    return buildComparisonStatus(
+      calculateTrailingReturn(
+        tickerData.QQQ.rows,
+        anchorDate,
+        historyTrailingPeriod
+      ),
+      calculateTrailingReturn(
+        tickerData.TQQQ.rows,
+        anchorDate,
+        historyTrailingPeriod
+      ),
+      "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다."
+    );
+  }, [anchorDate, historyTrailingPeriod, tickerData]);
+  const historyForwardStatus = useMemo(() => {
+    if (!tickerData || !anchorDate) {
+      return buildComparisonStatus(
+        null,
+        null,
+        "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
+      );
+    }
+
+    return buildComparisonStatus(
+      calculateForwardReturn(
+        tickerData.QQQ.rows,
+        anchorDate,
+        historyForwardPeriod
+      ),
+      calculateForwardReturn(
+        tickerData.TQQQ.rows,
+        anchorDate,
+        historyForwardPeriod
+      ),
+      "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
+    );
+  }, [anchorDate, historyForwardPeriod, tickerData]);
 
   const handleVisibleRangeChange = useEffectEvent((range: IRange<Time> | null) => {
     if (!tickerData || !range || !range.to) {
@@ -706,12 +766,16 @@ export function RollingComparison({
             </div>
             <div className="grid gap-3 xl:pt-1">
               <HistoryComparisonSummary
-                label={`트레일링 ${selectedPeriod.label}`}
-                status={detailStatus}
+                label="트레일링"
+                selectedPeriodId={historyTrailingPeriodId}
+                status={historyTrailingStatus}
+                onSelectPeriodId={setHistoryTrailingPeriodId}
               />
               <HistoryComparisonSummary
-                label={`포워드 ${selectedPeriod.label}`}
-                status={forwardStatus}
+                label="포워드"
+                selectedPeriodId={historyForwardPeriodId}
+                status={historyForwardStatus}
+                onSelectPeriodId={setHistoryForwardPeriodId}
               />
             </div>
             <div className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-white/78 px-3 py-2 text-sm font-medium text-[var(--text)]">
@@ -1058,16 +1122,39 @@ function DetailStatusPill({
 
 function HistoryComparisonSummary({
   label,
+  selectedPeriodId,
   status,
+  onSelectPeriodId,
 }: {
   label: string;
+  selectedPeriodId: PeriodId;
   status: ComparisonStatus;
+  onSelectPeriodId: (periodId: PeriodId) => void;
 }) {
   return (
     <div className="rounded-[22px] border border-[var(--line)] bg-white/72 px-4 py-3 shadow-sm">
-      <p className="mb-2 text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
-        {label}
-      </p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
+          {label} {periodLabelFromId(selectedPeriodId)}
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {PERIODS.map((period) => (
+            <button
+              key={`${label}-${period.id}`}
+              type="button"
+              onClick={() => onSelectPeriodId(period.id)}
+              className={[
+                "rounded-full border px-2 py-0.5 text-[11px] font-semibold transition",
+                selectedPeriodId === period.id
+                  ? "border-[rgba(23,32,51,0.24)] bg-[rgba(23,32,51,0.08)] text-[var(--text)]"
+                  : "border-[rgba(31,41,55,0.08)] bg-white/70 text-[var(--muted-text)] hover:border-[rgba(23,32,51,0.16)] hover:text-[var(--text)]",
+              ].join(" ")}
+            >
+              {period.label}
+            </button>
+          ))}
+        </div>
+      </div>
       {status.hasData ? (
         <div className="flex flex-wrap items-center gap-2">
           <DetailStatusPill
@@ -1089,6 +1176,10 @@ function HistoryComparisonSummary({
       )}
     </div>
   );
+}
+
+function periodLabelFromId(periodId: PeriodId): string {
+  return PERIODS.find((period) => period.id === periodId)?.label ?? "6M";
 }
 
 function buildComparisonStatus(
