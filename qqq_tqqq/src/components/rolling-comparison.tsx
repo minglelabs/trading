@@ -331,7 +331,7 @@ export function RollingComparison({
             <CardTitle className="text-3xl font-semibold tracking-[-0.04em] text-[var(--text)]">
               차트 데이터 파일이 없습니다.
             </CardTitle>
-            <CardDescription className="max-w-3xl text-base leading-7 text-[var(--muted)]">
+            <CardDescription className="max-w-3xl text-base leading-7 text-[var(--muted-text)]">
               먼저 <code className="rounded bg-black/5 px-1.5 py-0.5">python refresh_data.py</code>
               를 실행해서 <code className="rounded bg-black/5 px-1.5 py-0.5">public/chart-data.json</code>
               을 생성해 주세요.
@@ -347,13 +347,13 @@ export function RollingComparison({
       <section className="grid gap-5">
         <Card className={panelClassName}>
           <CardHeader className="gap-4 px-7 py-7">
-            <p className="m-0 text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
+            <p className="m-0 text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted-text)]">
               TradingView Lightweight Charts
             </p>
             <CardTitle className="text-[clamp(2.125rem,6vw,4rem)] leading-[0.96] font-semibold tracking-[-0.04em] text-[var(--text)]">
               QQQ / TQQQ Rolling Comparison
             </CardTitle>
-            <CardDescription className="max-w-4xl text-base leading-7 text-[var(--muted)]">
+            <CardDescription className="max-w-4xl text-base leading-7 text-[var(--muted-text)]">
               위 차트는 TradingView의 공식 차트 라이브러리인 Lightweight
               Charts로 구성했습니다. 상단 히스토리 차트를 좌우로 드래그하면
               기준 시점이 바뀌고, 아래의 trailing 수익률 비교가 즉시 다시
@@ -408,7 +408,7 @@ export function RollingComparison({
               <CardTitle className="text-3xl font-semibold tracking-[-0.03em] text-[var(--text)]">
                 전체 히스토리 네비게이터
               </CardTitle>
-              <CardDescription className="max-w-4xl text-[15px] leading-6 text-[var(--muted)]">
+              <CardDescription className="max-w-4xl text-[15px] leading-6 text-[var(--muted-text)]">
                 QQQ와 TQQQ의 장기 가격 흐름입니다. 이 차트를 좌우로 움직이면
                 아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
@@ -429,7 +429,7 @@ export function RollingComparison({
               <div ref={navigatorContainerRef} className={surfaceClassName} />
             </div>
           </CardContent>
-          <div className="px-6 pb-6 text-[13px] text-[var(--muted)]">
+          <div className="px-6 pb-6 text-[13px] text-[var(--muted-text)]">
             기준 시점은 현재 보이는 오른쪽 끝 날짜를 따라갑니다.
           </div>
         </Card>
@@ -440,11 +440,11 @@ export function RollingComparison({
               <CardTitle className="text-3xl font-semibold tracking-[-0.03em] text-[var(--text)]">
                 {selectedPeriod.label} trailing return comparison
               </CardTitle>
-              <CardDescription className="text-[15px] leading-6 text-[var(--muted)]">
+              <CardDescription className="text-[15px] leading-6 text-[var(--muted-text)]">
                 {detailRangeLabel}
               </CardDescription>
             </div>
-            <p className="text-sm text-[var(--muted)]">{detailStatusText}</p>
+            <p className="text-sm text-[var(--muted-text)]">{detailStatusText}</p>
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <div className="grid gap-5 px-5 pb-5 lg:grid-cols-[340px_minmax(0,1fr)]">
@@ -485,7 +485,7 @@ export function RollingComparison({
               </div>
             </div>
           </CardContent>
-          <div className="px-6 pb-6 text-[13px] text-[var(--muted)]">
+          <div className="px-6 pb-6 text-[13px] text-[var(--muted-text)]">
             기간 카드를 누르면 1개월/3개월/6개월/1년/5년 중 원하는 비교
             구간으로 즉시 전환됩니다.
           </div>
@@ -506,11 +506,11 @@ function SummaryCard({
 }) {
   return (
     <Card className={`${panelClassName} gap-3 px-5 py-4`}>
-      <p className="m-0 text-xs font-bold uppercase tracking-[0.08em] text-[var(--muted)]">
+      <p className="m-0 text-xs font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
         {label}
       </p>
       <p className="m-0 text-2xl font-semibold text-[var(--text)]">{value}</p>
-      <p className="m-0 text-sm leading-6 text-[var(--muted)]">{detail}</p>
+      <p className="m-0 text-sm leading-6 text-[var(--muted-text)]">{detail}</p>
     </Card>
   );
 }
@@ -533,7 +533,7 @@ function Pill({ label, color }: { label: string; color: string }) {
 
 function returnClassName(value: number | null): string {
   if (value === null) {
-    return "text-sm text-[#97a0af]";
+    return "text-sm text-[#4b5563]";
   }
 
   return value >= 0
@@ -553,7 +553,7 @@ function createBaseChart(
         type: ColorType.Solid,
         color: "#fffaf3",
       },
-      textColor: "#304257",
+      textColor: "#1f2937",
       fontFamily:
         '"IBM Plex Sans KR", "Pretendard Variable", "SUIT", "Apple SD Gothic Neo", sans-serif',
     },

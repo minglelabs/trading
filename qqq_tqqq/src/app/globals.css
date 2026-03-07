@@ -16,7 +16,7 @@
   --secondary: #f2ede4;
   --secondary-foreground: #172033;
   --muted: #f2ede4;
-  --muted-foreground: #536074;
+  --muted-foreground: #2c3545;
   --accent: #f7f2ea;
   --accent-foreground: #172033;
   --destructive: #ba181b;
@@ -27,7 +27,7 @@
   --line: rgba(31, 41, 55, 0.12);
   --paper: rgba(255, 251, 245, 0.94);
   --text: #172033;
-  --muted-text: #536074;
+  --muted-text: #2c3545;
   --shadow: 0 24px 60px rgba(23, 32, 51, 0.08);
 }
 
