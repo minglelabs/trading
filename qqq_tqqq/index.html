@@ -2,13 +2,21 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QQQ / TQQQ Charts</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    />
+    <title>QQQ / TQQQ Rolling Comparison</title>
+    <script
+      type="text/javascript"
+      src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"
+    ></script>
+    <script type="text/javascript" src="./chart-data.js"></script>
     <style>
       :root {
         color-scheme: light;
         --bg: #f4efe5;
-        --paper: rgba(255, 251, 245, 0.88);
+        --paper: rgba(255, 251, 245, 0.94);
         --line: rgba(31, 41, 55, 0.12);
         --text: #172033;
         --muted: #536074;
@@ -34,9 +42,17 @@
       }
 
       .shell {
-        width: min(1200px, calc(100% - 32px));
+        width: min(1320px, calc(100% - 32px));
         margin: 0 auto;
-        padding: 32px 0 48px;
+        padding: 28px 0 48px;
+      }
+
+      .hero,
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
       }
 
       .hero {
@@ -44,11 +60,6 @@
         gap: 16px;
         padding: 28px;
         margin-bottom: 20px;
-        border: 1px solid var(--line);
-        border-radius: 28px;
-        background: var(--paper);
-        backdrop-filter: blur(16px);
-        box-shadow: var(--shadow);
       }
 
       .eyebrow {
@@ -67,9 +78,9 @@
         letter-spacing: -0.04em;
       }
 
-      .hero p {
+      .hero-copy {
         margin: 0;
-        max-width: 780px;
+        max-width: 920px;
         font-size: 16px;
         line-height: 1.6;
         color: var(--muted);
@@ -88,8 +99,7 @@
         padding: 10px 14px;
         border: 1px solid var(--line);
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.65);
-        color: var(--text);
+        background: rgba(255, 255, 255, 0.72);
         font-size: 13px;
       }
 
@@ -99,79 +109,188 @@
         border-radius: 999px;
       }
 
-      .grid {
+      .layout {
         display: grid;
         gap: 20px;
       }
 
-      .detail-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
       }
 
-      .card {
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 28px;
-        background: var(--paper);
-        box-shadow: var(--shadow);
+      .summary-card {
+        padding: 18px 20px;
       }
 
-      .card-header {
+      .summary-label {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .summary-value {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .summary-detail {
+        margin: 8px 0 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .panel-head {
         display: flex;
         justify-content: space-between;
         align-items: end;
         gap: 16px;
-        padding: 20px 22px 14px;
+        padding: 22px 24px 12px;
       }
 
-      .card-title {
+      .panel-title {
         margin: 0;
-        font-size: 22px;
-        line-height: 1.1;
+        font-size: 24px;
+        line-height: 1.05;
       }
 
-      .card-copy {
-        margin: 6px 0 0;
-        color: var(--muted);
+      .panel-copy {
+        margin: 8px 0 0;
         font-size: 14px;
-        line-height: 1.5;
+        line-height: 1.6;
+        color: var(--muted);
       }
 
-      .widget-frame {
-        height: 460px;
+      .chart-box {
+        height: 340px;
+        padding: 0 14px 14px;
       }
 
-      .widget-frame.tall {
-        height: 620px;
+      .chart-box--detail {
+        height: 420px;
       }
 
-      .tradingview-widget-container {
+      .chart-surface {
         width: 100%;
         height: 100%;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid rgba(31, 41, 55, 0.08);
+        background: #fffaf3;
       }
 
-      .tradingview-widget-container__widget {
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 340px minmax(0, 1fr);
+        gap: 20px;
+      }
+
+      .period-grid {
+        display: grid;
+        gap: 10px;
+        padding: 0 0 20px 20px;
+      }
+
+      .period-card {
+        display: grid;
+        gap: 8px;
         width: 100%;
-        height: calc(100% - 40px);
+        padding: 16px;
+        border: 1px solid rgba(31, 41, 55, 0.1);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.78);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
       }
 
-      .tradingview-widget-copyright {
-        padding: 12px 18px 16px;
+      .period-card:hover {
+        transform: translateY(-1px);
+        border-color: rgba(23, 32, 51, 0.2);
+      }
+
+      .period-card.is-selected {
+        border-color: rgba(23, 32, 51, 0.32);
+        background: #fffdf9;
+      }
+
+      .period-card__label {
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .period-card__return {
+        font-size: 14px;
         color: var(--muted);
-        font-size: 12px;
       }
 
-      .tradingview-widget-copyright a {
-        color: inherit;
+      .period-card__return.is-positive {
+        color: var(--qqq);
       }
 
-      @media (max-width: 900px) {
+      .period-card__return.is-negative {
+        color: var(--tqqq);
+      }
+
+      .period-card__return.is-empty {
+        color: #97a0af;
+      }
+
+      .detail-side {
+        display: grid;
+        gap: 16px;
+        align-content: start;
+      }
+
+      .detail-status {
+        margin: 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .footer-note {
+        padding: 0 24px 22px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 1080px) {
         .detail-grid {
           grid-template-columns: 1fr;
         }
 
-        .widget-frame.tall {
-          height: 520px;
+        .period-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          padding: 0 20px 20px;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          width: min(100%, calc(100% - 16px));
+          padding-top: 12px;
+        }
+
+        .summary-grid,
+        .period-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .hero,
+        .panel {
+          border-radius: 22px;
+        }
+
+        .chart-box,
+        .chart-box--detail {
+          height: 320px;
         }
       }
     </style>
@@ -179,202 +298,81 @@
   <body>
     <main class="shell">
       <section class="hero">
-        <p class="eyebrow">TradingView Widgets</p>
-        <h1>QQQ / TQQQ 차트</h1>
-        <p>
-          직접 차트를 그리지 않고 TradingView 공식 위젯으로 구성했습니다.
-          위에는 상대 수익률 비교, 아래에는 각 종목의 상세 캔들 차트를 배치했습니다.
+        <p class="eyebrow">TradingView Lightweight Charts</p>
+        <h1>QQQ / TQQQ Rolling Comparison</h1>
+        <p class="hero-copy">
+          위 차트는 수동 위젯이 아니라 TradingView의 공식 차트 라이브러리인
+          Lightweight Charts로 구성했습니다. 상단 히스토리 차트를 좌우로 드래그하면
+          기준 시점이 바뀌고, 아래의 trailing 수익률 비교가 즉시 다시 계산됩니다.
         </p>
         <div class="pill-row">
-          <span class="pill"><span class="dot" style="background: var(--qqq)"></span>NASDAQ:QQQ</span>
-          <span class="pill"><span class="dot" style="background: var(--tqqq)"></span>NASDAQ:TQQQ</span>
-          <span class="pill">인터넷 연결 필요</span>
+          <span class="pill"><span class="dot" style="background: var(--qqq)"></span>QQQ</span>
+          <span class="pill"><span class="dot" style="background: var(--tqqq)"></span>TQQQ</span>
+          <span class="pill">상단 차트를 좌우로 드래그</span>
+          <span class="pill">마우스휠로 확대/축소</span>
         </div>
       </section>
 
-      <section class="grid">
-        <article class="card">
-          <div class="card-header">
+      <section class="summary-grid">
+        <article class="panel summary-card">
+          <p class="summary-label">기준 시점</p>
+          <p class="summary-value" id="anchor-date">-</p>
+          <p class="summary-detail" id="anchor-window">-</p>
+        </article>
+        <article class="panel summary-card">
+          <p class="summary-label">데이터 범위</p>
+          <p class="summary-value" id="data-range">-</p>
+          <p class="summary-detail" id="coverage-note">-</p>
+        </article>
+        <article class="panel summary-card">
+          <p class="summary-label">마지막 갱신</p>
+          <p class="summary-value" id="generated-at">-</p>
+          <p class="summary-detail">`refresh_data.py`로 다시 생성할 수 있습니다.</p>
+        </article>
+      </section>
+
+      <section class="layout">
+        <article class="panel">
+          <div class="panel-head">
             <div>
-              <h2 class="card-title">비교 차트</h2>
-              <p class="card-copy">
-                QQQ를 기준으로 TQQQ를 퍼센트 스케일에서 같이 비교합니다.
+              <h2 class="panel-title">전체 히스토리 네비게이터</h2>
+              <p class="panel-copy">
+                `TQQQ` 상장일을 100으로 맞춘 상대 지수입니다. 이 차트를 좌우로 움직이면
+                아래의 기간별 비교 기준일이 바뀝니다.
               </p>
             </div>
           </div>
-          <div class="widget-frame">
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <div class="tradingview-widget-copyright">
-                <a
-                  href="https://www.tradingview.com/symbols/NASDAQ-QQQ/?utm_source=local&utm_medium=widget&utm_campaign=symbol-overview"
-                  rel="noopener nofollow"
-                  target="_blank"
-                >
-                  <span>QQQ vs TQQQ</span>
-                </a>
-                <span> by TradingView</span>
-              </div>
-              <script
-                type="text/javascript"
-                src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js"
-                async
-              >
-                {
-                  "symbols": [
-                    [
-                      "Invesco QQQ",
-                      "NASDAQ:QQQ|1D"
-                    ]
-                  ],
-                  "chartOnly": true,
-                  "width": "100%",
-                  "height": "100%",
-                  "autosize": true,
-                  "locale": "kr",
-                  "colorTheme": "light",
-                  "showVolume": false,
-                  "showMA": false,
-                  "hideDateRanges": false,
-                  "hideMarketStatus": true,
-                  "hideSymbolLogo": true,
-                  "scalePosition": "right",
-                  "scaleMode": "Percentage",
-                  "fontFamily": "IBM Plex Sans KR, Pretendard Variable, SUIT, Apple SD Gothic Neo, sans-serif",
-                  "fontSize": "12",
-                  "noTimeScale": false,
-                  "valuesTracking": "1",
-                  "changeMode": "price-and-percent",
-                  "chartType": "line",
-                  "lineWidth": 3,
-                  "lineType": 0,
-                  "compareSymbol": {
-                    "symbol": "NASDAQ:TQQQ",
-                    "lineColor": "rgba(186, 24, 27, 1)",
-                    "lineWidth": 3
-                  },
-                  "dateRanges": [
-                    "1m|30",
-                    "3m|60",
-                    "6m|1D",
-                    "12m|1D",
-                    "60m|1W"
-                  ],
-                  "bottomColor": "rgba(255, 255, 255, 0)",
-                  "dateFormat": "yyyy-MM-dd",
-                  "timeHoursFormat": "24-hours"
-                }
-              </script>
-            </div>
+          <div class="chart-box">
+            <div class="chart-surface" id="navigator-chart"></div>
           </div>
+          <p class="footer-note">
+            기준 시점은 현재 보이는 오른쪽 끝 날짜를 따라갑니다.
+          </p>
         </article>
 
-        <div class="grid detail-grid">
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <h2 class="card-title">QQQ 상세 차트</h2>
-                <p class="card-copy">
-                  일봉 기준 캔들 차트입니다. 이동평균선과 거래량을 함께 표시합니다.
-                </p>
-              </div>
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title" id="detail-title">Trailing return comparison</h2>
+              <p class="panel-copy" id="detail-window">-</p>
             </div>
-            <div class="widget-frame tall">
-              <div class="tradingview-widget-container">
-                <div class="tradingview-widget-container__widget"></div>
-                <div class="tradingview-widget-copyright">
-                  <a
-                    href="https://www.tradingview.com/symbols/NASDAQ-QQQ/?utm_source=local&utm_medium=widget&utm_campaign=advanced-chart"
-                    rel="noopener nofollow"
-                    target="_blank"
-                  >
-                    <span>QQQ stock chart</span>
-                  </a>
-                  <span> by TradingView</span>
-                </div>
-                <script
-                  type="text/javascript"
-                  src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-                  async
-                >
-                  {
-                    "autosize": true,
-                    "symbol": "NASDAQ:QQQ",
-                    "interval": "D",
-                    "timezone": "exchange",
-                    "theme": "light",
-                    "backgroundColor": "rgba(255, 255, 255, 1)",
-                    "style": "1",
-                    "withdateranges": true,
-                    "hide_side_toolbar": false,
-                    "allow_symbol_change": false,
-                    "save_image": true,
-                    "studies": [
-                      "Volume@tv-basicstudies",
-                      "MASimple@tv-basicstudies"
-                    ],
-                    "locale": "kr",
-                    "calendar": false,
-                    "support_host": "https://www.tradingview.com"
-                  }
-                </script>
-              </div>
+            <p class="detail-status" id="detail-status">-</p>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-side">
+              <div class="period-grid" id="period-cards"></div>
             </div>
-          </article>
-
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <h2 class="card-title">TQQQ 상세 차트</h2>
-                <p class="card-copy">
-                  일봉 기준 캔들 차트입니다. 레버리지 ETF 변동성을 같이 보실 수 있습니다.
-                </p>
-              </div>
+            <div class="chart-box chart-box--detail">
+              <div class="chart-surface" id="detail-chart"></div>
             </div>
-            <div class="widget-frame tall">
-              <div class="tradingview-widget-container">
-                <div class="tradingview-widget-container__widget"></div>
-                <div class="tradingview-widget-copyright">
-                  <a
-                    href="https://www.tradingview.com/symbols/NASDAQ-TQQQ/?utm_source=local&utm_medium=widget&utm_campaign=advanced-chart"
-                    rel="noopener nofollow"
-                    target="_blank"
-                  >
-                    <span>TQQQ stock chart</span>
-                  </a>
-                  <span> by TradingView</span>
-                </div>
-                <script
-                  type="text/javascript"
-                  src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-                  async
-                >
-                  {
-                    "autosize": true,
-                    "symbol": "NASDAQ:TQQQ",
-                    "interval": "D",
-                    "timezone": "exchange",
-                    "theme": "light",
-                    "backgroundColor": "rgba(255, 255, 255, 1)",
-                    "style": "1",
-                    "withdateranges": true,
-                    "hide_side_toolbar": false,
-                    "allow_symbol_change": false,
-                    "save_image": true,
-                    "studies": [
-                      "Volume@tv-basicstudies",
-                      "MASimple@tv-basicstudies"
-                    ],
-                    "locale": "kr",
-                    "calendar": false,
-                    "support_host": "https://www.tradingview.com"
-                  }
-                </script>
-              </div>
-            </div>
-          </article>
-        </div>
+          </div>
+          <p class="footer-note">
+            기간 카드를 누르면 `1개월/3개월/6개월/1년/5년` 중 원하는 비교 구간으로 즉시 전환됩니다.
+          </p>
+        </article>
       </section>
     </main>
+
+    <script type="text/javascript" src="./app.js"></script>
   </body>
 </html>
