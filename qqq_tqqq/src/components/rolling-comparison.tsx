@@ -75,7 +75,6 @@ type ComparisonStatus = {
 
 type HoverOverlayElementRefs = {
   root: HTMLDivElement | null;
-  date: HTMLParagraphElement | null;
   qqq: HTMLSpanElement | null;
   tqqq: HTMLSpanElement | null;
 };
@@ -148,19 +147,16 @@ export function RollingComparison({
   const forwardSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
   const navigatorHoverOverlayRef = useRef<HoverOverlayElementRefs>({
     root: null,
-    date: null,
     qqq: null,
     tqqq: null,
   });
   const detailHoverOverlayRef = useRef<HoverOverlayElementRefs>({
     root: null,
-    date: null,
     qqq: null,
     tqqq: null,
   });
   const forwardHoverOverlayRef = useRef<HoverOverlayElementRefs>({
     root: null,
-    date: null,
     qqq: null,
     tqqq: null,
   });
@@ -799,9 +795,6 @@ export function RollingComparison({
                 onRootRef={(node) => {
                   navigatorHoverOverlayRef.current.root = node;
                 }}
-                onDateRef={(node) => {
-                  navigatorHoverOverlayRef.current.date = node;
-                }}
                 onQqqRef={(node) => {
                   navigatorHoverOverlayRef.current.qqq = node;
                 }}
@@ -891,9 +884,6 @@ export function RollingComparison({
                   onRootRef={(node) => {
                     detailHoverOverlayRef.current.root = node;
                   }}
-                  onDateRef={(node) => {
-                    detailHoverOverlayRef.current.date = node;
-                  }}
                   onQqqRef={(node) => {
                     detailHoverOverlayRef.current.qqq = node;
                   }}
@@ -979,9 +969,6 @@ export function RollingComparison({
                   onRootRef={(node) => {
                     forwardHoverOverlayRef.current.root = node;
                   }}
-                  onDateRef={(node) => {
-                    forwardHoverOverlayRef.current.date = node;
-                  }}
                   onQqqRef={(node) => {
                     forwardHoverOverlayRef.current.qqq = node;
                   }}
@@ -1054,31 +1041,26 @@ function ChartLegendPill({ label, color }: { label: string; color: string }) {
 
 function ChartHoverOverlay({
   onRootRef,
-  onDateRef,
   onQqqRef,
   onTqqqRef,
 }: {
   onRootRef: (node: HTMLDivElement | null) => void;
-  onDateRef: (node: HTMLParagraphElement | null) => void;
   onQqqRef: (node: HTMLSpanElement | null) => void;
   onTqqqRef: (node: HTMLSpanElement | null) => void;
 }) {
   return (
     <div
       ref={onRootRef}
-      className="pointer-events-none absolute top-4 right-5 z-10 hidden max-w-[calc(100%-40px)] flex-col items-end gap-2"
+      className="pointer-events-none absolute inset-0 z-10 hidden"
     >
-      <p ref={onDateRef} className="rounded-full border border-[var(--line)] bg-white/90 px-3 py-1 text-[12px] font-semibold text-[var(--text)] shadow-sm" />
-      <div className="flex flex-wrap justify-end gap-2">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/92 px-3 py-1.5 text-sm font-medium text-[var(--text)] shadow-sm">
-          <span className="font-bold text-[#0b6e4f]">QQQ</span>
-          <span ref={onQqqRef} />
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/92 px-3 py-1.5 text-sm font-medium text-[var(--text)] shadow-sm">
-          <span className="font-bold text-[#ba181b]">TQQQ</span>
-          <span ref={onTqqqRef} />
-        </div>
-      </div>
+      <span
+        ref={onQqqRef}
+        className="absolute right-1 hidden -translate-y-1/2 rounded-[6px] bg-[#111827] px-2 py-1 text-[13px] font-semibold tracking-[0.01em] text-white shadow-[0_10px_24px_rgba(17,24,39,0.22)]"
+      />
+      <span
+        ref={onTqqqRef}
+        className="absolute right-1 hidden -translate-y-1/2 rounded-[6px] bg-[#111827] px-2 py-1 text-[13px] font-semibold tracking-[0.01em] text-white shadow-[0_10px_24px_rgba(17,24,39,0.22)]"
+      />
     </div>
   );
 }
@@ -1267,12 +1249,7 @@ function syncHoverOverlay(
   param: MouseEventParams<Time>,
   seriesRefs: SeriesRefs
 ): void {
-  if (
-    !overlayRefs.root ||
-    !overlayRefs.date ||
-    !overlayRefs.qqq ||
-    !overlayRefs.tqqq
-  ) {
+  if (!overlayRefs.root || !overlayRefs.qqq || !overlayRefs.tqqq) {
     return;
   }
 
@@ -1289,15 +1266,42 @@ function syncHoverOverlay(
     return;
   }
 
-  overlayRefs.root.style.display = "flex";
-  overlayRefs.date.textContent = formatDate(timeToDateKey(param.time));
-  overlayRefs.qqq.textContent = qqqValue === null ? "N/A" : formatHoverValue(qqqValue);
-  overlayRefs.tqqq.textContent = tqqqValue === null ? "N/A" : formatHoverValue(tqqqValue);
+  overlayRefs.root.style.display = "block";
+
+  const qqqY =
+    qqqValue === null ? null : seriesRefs.QQQ.priceToCoordinate(qqqValue);
+  const tqqqY =
+    tqqqValue === null ? null : seriesRefs.TQQQ.priceToCoordinate(tqqqValue);
+
+  const positions = resolveAxisLabelPositions(
+    overlayRefs.root.clientHeight,
+    overlayRefs.qqq.offsetHeight || 30,
+    overlayRefs.tqqq.offsetHeight || 30,
+    qqqY,
+    tqqqY
+  );
+
+  applyAxisHoverLabel(
+    overlayRefs.qqq,
+    qqqValue,
+    positions.qqq
+  );
+  applyAxisHoverLabel(
+    overlayRefs.tqqq,
+    tqqqValue,
+    positions.tqqq
+  );
 }
 
 function hideHoverOverlay(overlayRefs: HoverOverlayElementRefs): void {
   if (overlayRefs.root) {
     overlayRefs.root.style.display = "none";
+  }
+  if (overlayRefs.qqq) {
+    overlayRefs.qqq.style.display = "none";
+  }
+  if (overlayRefs.tqqq) {
+    overlayRefs.tqqq.style.display = "none";
   }
 }
 
@@ -1319,6 +1323,78 @@ function formatHoverValue(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function applyAxisHoverLabel(
+  element: HTMLSpanElement,
+  value: number | null,
+  top: number | null
+): void {
+  if (value === null || top === null) {
+    element.style.display = "none";
+    return;
+  }
+
+  element.style.display = "block";
+  element.style.top = `${top}px`;
+  element.textContent = formatHoverValue(value);
+}
+
+function resolveAxisLabelPositions(
+  containerHeight: number,
+  qqqHeight: number,
+  tqqqHeight: number,
+  qqqY: number | null,
+  tqqqY: number | null
+): { qqq: number | null; tqqq: number | null } {
+  const padding = 8;
+  const minGap = 8;
+
+  let qqqTop = clampAxisY(qqqY, qqqHeight, containerHeight, padding);
+  let tqqqTop = clampAxisY(tqqqY, tqqqHeight, containerHeight, padding);
+
+  if (qqqTop === null || tqqqTop === null) {
+    return { qqq: qqqTop, tqqq: tqqqTop };
+  }
+
+  const requiredGap = (qqqHeight + tqqqHeight) / 2 + minGap;
+  const currentGap = Math.abs(qqqTop - tqqqTop);
+
+  if (currentGap >= requiredGap) {
+    return { qqq: qqqTop, tqqq: tqqqTop };
+  }
+
+  const midpoint = (qqqTop + tqqqTop) / 2;
+  qqqTop = midpoint - requiredGap / 2;
+  tqqqTop = midpoint + requiredGap / 2;
+
+  qqqTop = clampAxisY(qqqTop, qqqHeight, containerHeight, padding) ?? qqqTop;
+  tqqqTop = clampAxisY(tqqqTop, tqqqHeight, containerHeight, padding) ?? tqqqTop;
+
+  if (qqqTop + requiredGap > tqqqTop) {
+    qqqTop = Math.max(padding + qqqHeight / 2, tqqqTop - requiredGap);
+    tqqqTop = Math.min(
+      containerHeight - padding - tqqqHeight / 2,
+      qqqTop + requiredGap
+    );
+  }
+
+  return { qqq: qqqTop, tqqq: tqqqTop };
+}
+
+function clampAxisY(
+  y: number | null,
+  labelHeight: number,
+  containerHeight: number,
+  padding: number
+): number | null {
+  if (y === null || Number.isNaN(y)) {
+    return null;
+  }
+
+  const min = padding + labelHeight / 2;
+  const max = containerHeight - padding - labelHeight / 2;
+  return Math.min(Math.max(y, min), max);
 }
 
 function createBaseChart(
@@ -1359,6 +1435,7 @@ function createBaseChart(
         color: "rgba(23, 32, 51, 0.16)",
         width: 1,
         style: LineStyle.Dashed,
+        labelVisible: false,
       },
     },
     handleScroll: {
