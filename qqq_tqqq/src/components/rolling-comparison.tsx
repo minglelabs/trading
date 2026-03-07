@@ -37,6 +37,7 @@ import {
   ChartPayload,
   COLORS,
   findNearestCommonDate,
+  findIndexOnOrBefore,
   formatDate,
   formatDateTime,
   formatPercent,
@@ -99,6 +100,10 @@ export function RollingComparison({
         ? normalizeAgainstDate(tickerData.TQQQ.rows, overlapAnchorDate)
         : [],
     [overlapAnchorDate, tickerData]
+  );
+  const navigatorDateKeys = useMemo(
+    () => navigatorTqqqRows.map((row) => row.time),
+    [navigatorTqqqRows]
   );
   const initialVisibleFrom = useMemo(
     () => {
@@ -215,6 +220,47 @@ export function RollingComparison({
     });
   });
 
+  const handleNavigatorArrowStep = useEffectEvent((offset: -1 | 1) => {
+    if (
+      !navigatorChartRef.current ||
+      !anchorDate ||
+      !visibleWindowFrom ||
+      navigatorDateKeys.length === 0
+    ) {
+      return;
+    }
+
+    const endIndex = findIndexOnOrBefore(navigatorTqqqRows, anchorDate);
+    const startIndex = findIndexOnOrBefore(navigatorTqqqRows, visibleWindowFrom);
+    if (startIndex < 0 || endIndex < 0 || startIndex > endIndex) {
+      return;
+    }
+
+    const lastIndex = navigatorDateKeys.length - 1;
+    const windowSize = endIndex - startIndex;
+    let nextStartIndex = startIndex + offset;
+    let nextEndIndex = endIndex + offset;
+
+    if (nextStartIndex < 0) {
+      nextStartIndex = 0;
+      nextEndIndex = Math.min(lastIndex, windowSize);
+    }
+
+    if (nextEndIndex > lastIndex) {
+      nextEndIndex = lastIndex;
+      nextStartIndex = Math.max(0, lastIndex - windowSize);
+    }
+
+    if (nextStartIndex === startIndex && nextEndIndex === endIndex) {
+      return;
+    }
+
+    navigatorChartRef.current.timeScale().setVisibleRange({
+      from: toBusinessDay(navigatorDateKeys[nextStartIndex]),
+      to: toBusinessDay(navigatorDateKeys[nextEndIndex]),
+    });
+  });
+
   useEffect(() => {
     if (
       !tickerData ||
@@ -322,6 +368,35 @@ export function RollingComparison({
 
     applyNavigatorScale(navigatorChartRef.current, navigatorScaleMode);
   }, [navigatorScaleMode]);
+
+  useEffect(() => {
+    if (navigatorDateKeys.length === 0) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+
+      if (isTextEditingElement(document.activeElement)) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        handleNavigatorArrowStep(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        handleNavigatorArrowStep(1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [navigatorDateKeys.length]);
 
   useEffect(() => {
     if (
@@ -469,7 +544,8 @@ export function RollingComparison({
             </div>
           </CardContent>
           <div className="px-6 pb-6 text-[13px] text-[var(--muted-text)]">
-            기준 시점은 현재 보이는 오른쪽 끝 날짜를 따라갑니다.
+            기준 시점은 현재 보이는 오른쪽 끝 날짜를 따라갑니다. 좌우 방향키로
+            하루씩 이동할 수도 있습니다.
           </div>
         </Card>
 
@@ -595,6 +671,20 @@ function returnClassName(value: number | null): string {
   return value >= 0
     ? "text-sm font-medium text-[#0b6e4f]"
     : "text-sm font-medium text-[#ba181b]";
+}
+
+function isTextEditingElement(target: Element | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName;
+  return (
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT" ||
+    target.isContentEditable
+  );
 }
 
 function createBaseChart(
