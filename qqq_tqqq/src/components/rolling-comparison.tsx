@@ -21,8 +21,10 @@ import {
   PriceScaleMode,
   Time,
 } from "lightweight-charts";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -79,6 +81,13 @@ type HoverOverlayElementRefs = {
   tqqq: HTMLSpanElement | null;
 };
 
+type CalendarCell = {
+  dateKey: string;
+  day: number;
+  inMonth: boolean;
+  disabled: boolean;
+};
+
 interface RollingComparisonProps {
   initialData: ChartPayload | null;
 }
@@ -88,6 +97,8 @@ const panelClassName =
 
 const surfaceClassName =
   "h-full w-full overflow-visible rounded-[20px] border border-[rgba(31,41,55,0.08)] bg-[#fffaf3]";
+
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export function RollingComparison({
   initialData,
@@ -160,6 +171,8 @@ export function RollingComparison({
     qqq: null,
     tqqq: null,
   });
+  const anchorPickerRef = useRef<HTMLDivElement | null>(null);
+  const anchorPickerInputRef = useRef<HTMLInputElement | null>(null);
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<PeriodId>("6m");
   const [historyTrailingPeriodId, setHistoryTrailingPeriodId] =
@@ -171,6 +184,13 @@ export function RollingComparison({
   const [anchorDate, setAnchorDate] = useState<string | null>(latestCommonDate);
   const [visibleWindowFrom, setVisibleWindowFrom] =
     useState<string | null>(initialVisibleFrom);
+  const [isAnchorPickerOpen, setIsAnchorPickerOpen] = useState(false);
+  const [anchorPickerDraftDate, setAnchorPickerDraftDate] = useState(
+    latestCommonDate ?? ""
+  );
+  const [anchorPickerMonthKey, setAnchorPickerMonthKey] = useState(
+    latestCommonDate ? latestCommonDate.slice(0, 7) : ""
+  );
 
   const selectedPeriod = useMemo(
     () => PERIODS.find((period) => period.id === selectedPeriodId) ?? PERIODS[3],
@@ -329,6 +349,128 @@ export function RollingComparison({
       "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
     );
   }, [anchorDate, historyForwardPeriod, tickerData]);
+  const anchorPickerDateKey =
+    anchorPickerDraftDate ||
+    anchorDate ||
+    latestCommonDate ||
+    overlapAnchorDate ||
+    "1970-01-01";
+  const anchorPickerMinDate = overlapAnchorDate ?? anchorPickerDateKey;
+  const anchorPickerMaxDate = latestCommonDate ?? anchorPickerDateKey;
+  const anchorPickerYear = Number(anchorPickerDateKey.slice(0, 4));
+  const anchorPickerMonth = Number(anchorPickerDateKey.slice(5, 7));
+  const anchorPickerDay = Number(anchorPickerDateKey.slice(8, 10));
+  const anchorPickerYears = useMemo(
+    () => buildYearOptions(anchorPickerMinDate, anchorPickerMaxDate),
+    [anchorPickerMaxDate, anchorPickerMinDate]
+  );
+  const anchorPickerDays = useMemo(
+    () => buildDayOptions(anchorPickerYear, anchorPickerMonth),
+    [anchorPickerMonth, anchorPickerYear]
+  );
+  const anchorCalendarCells = useMemo(
+    () =>
+      buildCalendarCells(
+        anchorPickerMonthKey || getMonthKey(anchorPickerDateKey),
+        anchorPickerMinDate,
+        anchorPickerMaxDate
+      ),
+    [
+      anchorPickerDateKey,
+      anchorPickerMonthKey,
+      anchorPickerMaxDate,
+      anchorPickerMinDate,
+    ]
+  );
+
+  const handleAnchorDateSelection = (targetDateKey: string) => {
+    if (!tickerData) {
+      return;
+    }
+
+    const clampedTarget = clampDateKey(
+      targetDateKey,
+      anchorPickerMinDate,
+      anchorPickerMaxDate
+    );
+    const nextAnchor = findNearestCommonDate(tickerData, clampedTarget);
+    if (!nextAnchor) {
+      return;
+    }
+
+    const nextEndIndex = findIndexOnOrBefore(navigatorTqqqRows, nextAnchor);
+    if (nextEndIndex < 0) {
+      return;
+    }
+
+    const currentEndIndex = anchorDate
+      ? findIndexOnOrBefore(navigatorTqqqRows, anchorDate)
+      : -1;
+    const currentStartIndex = visibleWindowFrom
+      ? findIndexOnOrBefore(navigatorTqqqRows, visibleWindowFrom)
+      : -1;
+    const fallbackStartIndex = initialVisibleFrom
+      ? findIndexOnOrBefore(navigatorTqqqRows, initialVisibleFrom)
+      : 0;
+    const windowSize =
+      currentStartIndex >= 0 && currentEndIndex >= currentStartIndex
+        ? currentEndIndex - currentStartIndex
+        : Math.max(0, nextEndIndex - Math.max(0, fallbackStartIndex));
+    const nextStartIndex = Math.max(0, nextEndIndex - windowSize);
+    const nextVisibleFrom = navigatorDateKeys[nextStartIndex] ?? nextAnchor;
+
+    if (navigatorChartRef.current) {
+      navigatorChartRef.current.timeScale().setVisibleRange({
+        from: toBusinessDay(nextVisibleFrom),
+        to: toBusinessDay(nextAnchor),
+      });
+    }
+
+    startTransition(() => {
+      setAnchorDate(nextAnchor);
+      setVisibleWindowFrom(nextVisibleFrom);
+      setAnchorPickerDraftDate(nextAnchor);
+      setAnchorPickerMonthKey(getMonthKey(nextAnchor));
+    });
+    setIsAnchorPickerOpen(false);
+  };
+
+  const handleAnchorPickerInputChange = (nextDateKey: string) => {
+    if (!nextDateKey) {
+      return;
+    }
+    const normalized = clampDateKey(
+      nextDateKey,
+      anchorPickerMinDate,
+      anchorPickerMaxDate
+    );
+    setAnchorPickerDraftDate(normalized);
+    setAnchorPickerMonthKey(getMonthKey(normalized));
+  };
+
+  const handleAnchorPickerMonthStep = (delta: -1 | 1) => {
+    const nextMonthKey = shiftMonthKey(
+      anchorPickerMonthKey || getMonthKey(anchorPickerDateKey),
+      delta
+    );
+    const minMonthKey = getMonthKey(anchorPickerMinDate);
+    const maxMonthKey = getMonthKey(anchorPickerMaxDate);
+    const boundedMonthKey =
+      nextMonthKey < minMonthKey
+        ? minMonthKey
+        : nextMonthKey > maxMonthKey
+          ? maxMonthKey
+          : nextMonthKey;
+    const nextDraft = setDateKeyParts(anchorPickerDateKey, {
+      year: Number(boundedMonthKey.slice(0, 4)),
+      month: Number(boundedMonthKey.slice(5, 7)),
+    });
+
+    setAnchorPickerMonthKey(boundedMonthKey);
+    setAnchorPickerDraftDate(
+      clampDateKey(nextDraft, anchorPickerMinDate, anchorPickerMaxDate)
+    );
+  };
 
   const handleVisibleRangeChange = useEffectEvent((range: IRange<Time> | null) => {
     if (!tickerData || !range || !range.to) {
@@ -563,6 +705,37 @@ export function RollingComparison({
   ]);
 
   useEffect(() => {
+    if (!isAnchorPickerOpen) {
+      return;
+    }
+
+    anchorPickerInputRef.current?.focus();
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        anchorPickerRef.current &&
+        !anchorPickerRef.current.contains(event.target as Node)
+      ) {
+        setIsAnchorPickerOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsAnchorPickerOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isAnchorPickerOpen]);
+
+  useEffect(() => {
     if (!navigatorChartRef.current) {
       return;
     }
@@ -775,11 +948,241 @@ export function RollingComparison({
               </div>
             </div>
             <div className="space-y-2 xl:pt-1">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(23,32,51,0.12)] bg-[rgba(23,32,51,0.05)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
-                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
-                  기준일
-                </span>
-                <span>{anchorDate ? formatDate(anchorDate) : "-"}</span>
+              <div className="relative inline-flex" ref={anchorPickerRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isAnchorPickerOpen && anchorDate) {
+                      setAnchorPickerDraftDate(anchorDate);
+                      setAnchorPickerMonthKey(getMonthKey(anchorDate));
+                    }
+                    setIsAnchorPickerOpen((current) => !current);
+                  }}
+                  aria-expanded={isAnchorPickerOpen}
+                  aria-haspopup="dialog"
+                  className="inline-flex items-center gap-2 rounded-full border border-[rgba(23,32,51,0.12)] bg-[rgba(23,32,51,0.05)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition hover:border-[rgba(23,32,51,0.22)] hover:bg-[rgba(23,32,51,0.08)]"
+                >
+                  <CalendarDays className="size-3.5 text-[var(--muted-text)]" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
+                    기준일
+                  </span>
+                  <span>{anchorDate ? formatDate(anchorDate) : "-"}</span>
+                </button>
+                {isAnchorPickerOpen ? (
+                  <div
+                    role="dialog"
+                    aria-label="기준일 선택"
+                    className="absolute top-full left-0 z-30 mt-3 w-[min(420px,calc(100vw-48px))] rounded-[28px] border border-[var(--line)] bg-[#fffdf8] p-4 shadow-[0_22px_60px_rgba(16,24,40,0.18)]"
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-[var(--text)]">
+                          기준일 선택
+                        </p>
+                        <p className="text-[12px] leading-5 text-[var(--muted-text)]">
+                          날짜를 직접 입력하거나 달력에서 선택해 주세요. 휴장일을
+                          고르면 직전 공통 거래일로 맞춰집니다.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full border-[rgba(31,41,55,0.12)] bg-white/88 px-3"
+                        onClick={() => setIsAnchorPickerOpen(false)}
+                      >
+                        닫기
+                      </Button>
+                    </div>
+
+                    <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <label className="grid gap-1.5 text-[11px] font-semibold text-[var(--muted-text)]">
+                        직접 입력
+                        <input
+                          ref={anchorPickerInputRef}
+                          type="date"
+                          min={anchorPickerMinDate}
+                          max={anchorPickerMaxDate}
+                          value={anchorPickerDraftDate}
+                          onChange={(event) =>
+                            handleAnchorPickerInputChange(event.target.value)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              handleAnchorDateSelection(anchorPickerDraftDate);
+                            }
+                          }}
+                          className="h-11 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)] focus:ring-2 focus:ring-[rgba(23,32,51,0.08)]"
+                        />
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 sm:w-[140px] sm:grid-cols-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 rounded-2xl border-[rgba(23,32,51,0.12)] bg-white/86 px-4 text-sm font-semibold text-[var(--text)]"
+                          onClick={() => handleAnchorDateSelection(anchorPickerDraftDate)}
+                        >
+                          이동
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 rounded-2xl border-[rgba(23,32,51,0.12)] bg-white/70 px-4 text-sm font-semibold text-[var(--muted-text)]"
+                          onClick={() => {
+                            setAnchorPickerDraftDate(anchorPickerMaxDate);
+                            setAnchorPickerMonthKey(getMonthKey(anchorPickerMaxDate));
+                            handleAnchorDateSelection(anchorPickerMaxDate);
+                          }}
+                        >
+                          최신
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mb-4 grid grid-cols-3 gap-2">
+                      <label className="grid gap-1.5 text-[11px] font-semibold text-[var(--muted-text)]">
+                        연도
+                        <select
+                          value={String(anchorPickerYear)}
+                          onChange={(event) => {
+                            const nextDateKey = setDateKeyParts(anchorPickerDateKey, {
+                              year: Number(event.target.value),
+                            });
+                            handleAnchorPickerInputChange(nextDateKey);
+                          }}
+                          className="h-10 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)]"
+                        >
+                          {anchorPickerYears.map((year) => (
+                            <option key={year} value={year}>
+                              {year}년
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="grid gap-1.5 text-[11px] font-semibold text-[var(--muted-text)]">
+                        월
+                        <select
+                          value={String(anchorPickerMonth)}
+                          onChange={(event) => {
+                            const nextDateKey = setDateKeyParts(anchorPickerDateKey, {
+                              month: Number(event.target.value),
+                            });
+                            handleAnchorPickerInputChange(nextDateKey);
+                          }}
+                          className="h-10 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)]"
+                        >
+                          {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                            (month) => (
+                              <option key={month} value={month}>
+                                {month}월
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </label>
+                      <label className="grid gap-1.5 text-[11px] font-semibold text-[var(--muted-text)]">
+                        일
+                        <select
+                          value={String(anchorPickerDay)}
+                          onChange={(event) => {
+                            const nextDateKey = setDateKeyParts(anchorPickerDateKey, {
+                              day: Number(event.target.value),
+                            });
+                            handleAnchorPickerInputChange(nextDateKey);
+                          }}
+                          className="h-10 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)]"
+                        >
+                          {anchorPickerDays.map((day) => (
+                            <option key={day} value={day}>
+                              {day}일
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="rounded-[24px] border border-[rgba(23,32,51,0.08)] bg-white/86 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon-sm"
+                          className="rounded-full border-[rgba(23,32,51,0.12)] bg-white"
+                          onClick={() => handleAnchorPickerMonthStep(-1)}
+                        >
+                          <ChevronLeft className="size-4" />
+                        </Button>
+                        <div className="text-sm font-bold text-[var(--text)]">
+                          {formatMonthLabel(anchorPickerMonthKey)}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon-sm"
+                          className="rounded-full border-[rgba(23,32,51,0.12)] bg-white"
+                          onClick={() => handleAnchorPickerMonthStep(1)}
+                        >
+                          <ChevronRight className="size-4" />
+                        </Button>
+                      </div>
+                      <div className="mb-2 grid grid-cols-7 gap-1">
+                        {WEEKDAY_LABELS.map((dayLabel) => (
+                          <span
+                            key={dayLabel}
+                            className="px-1 py-1 text-center text-[11px] font-bold text-[var(--muted-text)]"
+                          >
+                            {dayLabel}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
+                        {anchorCalendarCells.map((cell) => {
+                          const isSelected = cell.dateKey === anchorPickerDraftDate;
+
+                          return (
+                            <button
+                              key={cell.dateKey}
+                              type="button"
+                              disabled={cell.disabled}
+                              onClick={() => handleAnchorDateSelection(cell.dateKey)}
+                              className={[
+                                "h-10 rounded-2xl text-sm font-medium transition",
+                                cell.disabled
+                                  ? "cursor-not-allowed bg-transparent text-[rgba(100,116,139,0.35)]"
+                                  : isSelected
+                                    ? "border border-[rgba(23,32,51,0.2)] bg-[rgba(23,32,51,0.1)] text-[var(--text)] shadow-sm"
+                                    : cell.inMonth
+                                      ? "text-[var(--text)] hover:bg-[rgba(23,32,51,0.06)]"
+                                      : "text-[rgba(100,116,139,0.58)] hover:bg-[rgba(23,32,51,0.04)]",
+                              ].join(" ")}
+                            >
+                              {cell.day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-3 flex justify-between gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-full border-[rgba(23,32,51,0.12)] bg-white/84 px-4 text-xs font-semibold text-[var(--muted-text)]"
+                          onClick={() => handleAnchorDateSelection(anchorPickerMinDate)}
+                        >
+                          최초 기준
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-full border-[rgba(23,32,51,0.12)] bg-white/84 px-4 text-xs font-semibold text-[var(--muted-text)]"
+                          onClick={() => handleAnchorDateSelection(anchorPickerMaxDate)}
+                        >
+                          최신 기준
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="grid gap-3">
                 <HistoryComparisonSummary
@@ -1514,4 +1917,90 @@ function toBusinessDay(dateKey: string): Time {
     month,
     day,
   };
+}
+
+function buildYearOptions(minDateKey: string, maxDateKey: string): number[] {
+  const minYear = Number(minDateKey.slice(0, 4));
+  const maxYear = Number(maxDateKey.slice(0, 4));
+  return Array.from({ length: maxYear - minYear + 1 }, (_, index) => minYear + index);
+}
+
+function buildDayOptions(year: number, month: number): number[] {
+  return Array.from({ length: getDaysInMonth(year, month) }, (_, index) => index + 1);
+}
+
+function clampDateKey(dateKey: string, minDateKey: string, maxDateKey: string): string {
+  if (dateKey < minDateKey) {
+    return minDateKey;
+  }
+  if (dateKey > maxDateKey) {
+    return maxDateKey;
+  }
+  return dateKey;
+}
+
+function getMonthKey(dateKey: string): string {
+  return dateKey.slice(0, 7);
+}
+
+function formatMonthLabel(monthKey: string): string {
+  return `${Number(monthKey.slice(0, 4))}년 ${Number(monthKey.slice(5, 7))}월`;
+}
+
+function shiftMonthKey(monthKey: string, delta: number): string {
+  const year = Number(monthKey.slice(0, 4));
+  const monthIndex = Number(monthKey.slice(5, 7)) - 1;
+  const shifted = new Date(Date.UTC(year, monthIndex + delta, 1));
+  return `${shifted.getUTCFullYear()}-${padNumber(shifted.getUTCMonth() + 1)}`;
+}
+
+function setDateKeyParts(
+  dateKey: string,
+  nextParts: Partial<{ year: number; month: number; day: number }>
+): string {
+  const year = nextParts.year ?? Number(dateKey.slice(0, 4));
+  const month = nextParts.month ?? Number(dateKey.slice(5, 7));
+  const day = Math.min(
+    nextParts.day ?? Number(dateKey.slice(8, 10)),
+    getDaysInMonth(year, month)
+  );
+
+  return `${padNumber(year, 4)}-${padNumber(month)}-${padNumber(day)}`;
+}
+
+function buildCalendarCells(
+  monthKey: string,
+  minDateKey: string,
+  maxDateKey: string
+): CalendarCell[] {
+  const year = Number(monthKey.slice(0, 4));
+  const month = Number(monthKey.slice(5, 7));
+  const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
+  const startWeekday = firstOfMonth.getUTCDay();
+  const startDate = new Date(Date.UTC(year, month - 1, 1 - startWeekday));
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const current = new Date(startDate);
+    current.setUTCDate(startDate.getUTCDate() + index);
+    const currentYear = current.getUTCFullYear();
+    const currentMonth = current.getUTCMonth() + 1;
+    const dateKey = `${padNumber(currentYear, 4)}-${padNumber(currentMonth)}-${padNumber(
+      current.getUTCDate()
+    )}`;
+
+    return {
+      dateKey,
+      day: current.getUTCDate(),
+      inMonth: currentMonth === month,
+      disabled: dateKey < minDateKey || dateKey > maxDateKey,
+    };
+  });
+}
+
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function padNumber(value: number, length = 2): string {
+  return String(value).padStart(length, "0");
 }
