@@ -181,18 +181,42 @@ export function RollingComparison({
     return `${formatDate(start)} ~ ${formatDate(end)}`;
   }, [qqqDetailWindow, tqqqDetailWindow]);
 
-  const detailStatusText = useMemo(() => {
+  const detailStatus = useMemo(() => {
     if (!qqqDetailWindow && !tqqqDetailWindow) {
-      return "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다.";
+      return {
+        hasData: false,
+        message: "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다.",
+        qqq: null,
+        tqqq: null,
+        highlights: [] as Array<"QQQ" | "TQQQ">,
+      };
     }
 
-    const qqqText = qqqDetailWindow
-      ? `QQQ ${formatPercent(qqqDetailWindow.returnPct)}`
-      : "QQQ N/A";
-    const tqqqText = tqqqDetailWindow
-      ? `TQQQ ${formatPercent(tqqqDetailWindow.returnPct)}`
-      : "TQQQ N/A";
-    return `${qqqText} / ${tqqqText}`;
+    const qqq = qqqDetailWindow?.returnPct ?? null;
+    const tqqq = tqqqDetailWindow?.returnPct ?? null;
+    let highlights: Array<"QQQ" | "TQQQ"> = [];
+
+    if (qqq !== null && tqqq !== null) {
+      if (qqq > tqqq) {
+        highlights = ["QQQ"];
+      } else if (tqqq > qqq) {
+        highlights = ["TQQQ"];
+      } else {
+        highlights = ["QQQ", "TQQQ"];
+      }
+    } else if (qqq !== null) {
+      highlights = ["QQQ"];
+    } else if (tqqq !== null) {
+      highlights = ["TQQQ"];
+    }
+
+    return {
+      hasData: true,
+      message: null,
+      qqq,
+      tqqq,
+      highlights,
+    };
   }, [qqqDetailWindow, tqqqDetailWindow]);
 
   const handleVisibleRangeChange = useEffectEvent((range: IRange<Time> | null) => {
@@ -559,7 +583,25 @@ export function RollingComparison({
                 {detailRangeLabel}
               </CardDescription>
             </div>
-            <p className="text-sm text-[var(--muted-text)]">{detailStatusText}</p>
+            {detailStatus.hasData ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <DetailStatusPill
+                  label="QQQ"
+                  value={detailStatus.qqq}
+                  color={COLORS.QQQ}
+                  highlighted={detailStatus.highlights.includes("QQQ")}
+                />
+                <span className="text-sm text-[var(--muted-text)]">/</span>
+                <DetailStatusPill
+                  label="TQQQ"
+                  value={detailStatus.tqqq}
+                  color={COLORS.TQQQ}
+                  highlighted={detailStatus.highlights.includes("TQQQ")}
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--muted-text)]">{detailStatus.message}</p>
+            )}
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <div className="grid gap-5 px-5 pb-5 lg:grid-cols-[340px_minmax(0,1fr)]">
@@ -663,6 +705,43 @@ function ChartLegendPill({ label, color }: { label: string; color: string }) {
   );
 }
 
+function DetailStatusPill({
+  label,
+  value,
+  color,
+  highlighted,
+}: {
+  label: "QQQ" | "TQQQ";
+  value: number | null;
+  color: string;
+  highlighted: boolean;
+}) {
+  return (
+    <span
+      className={[
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition",
+        highlighted
+          ? "font-semibold text-[var(--text)] shadow-sm"
+          : "bg-white/74 font-medium text-[var(--muted-text)]",
+      ].join(" ")}
+      style={{
+        borderColor: highlighted ? hexToRgba(color, 0.38) : "rgba(31, 41, 55, 0.1)",
+        backgroundColor: highlighted ? hexToRgba(color, 0.14) : undefined,
+      }}
+    >
+      <span
+        className={highlighted ? "font-bold" : "font-semibold"}
+        style={{ color }}
+      >
+        {label}
+      </span>
+      <span className={highlighted ? "text-[15px] font-bold" : ""}>
+        {value === null ? "N/A" : formatPercent(value)}
+      </span>
+    </span>
+  );
+}
+
 function returnClassName(value: number | null): string {
   if (value === null) {
     return "text-sm text-[#4b5563]";
@@ -685,6 +764,23 @@ function isTextEditingElement(target: Element | null): boolean {
     tagName === "SELECT" ||
     target.isContentEditable
   );
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "");
+  const fullHex =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
+
+  const red = parseInt(fullHex.slice(0, 2), 16);
+  const green = parseInt(fullHex.slice(2, 4), 16);
+  const blue = parseInt(fullHex.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function createBaseChart(
