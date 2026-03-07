@@ -774,21 +774,27 @@ export function RollingComparison({
                 </span>
               </div>
             </div>
-            <div className="grid gap-3 xl:pt-1">
-              <HistoryComparisonSummary
-                label="트레일링"
-                selectedPeriodId={historyTrailingPeriodId}
-                anchorDate={anchorDate}
-                status={historyTrailingStatus}
-                onSelectPeriodId={setHistoryTrailingPeriodId}
-              />
-              <HistoryComparisonSummary
-                label="포워드"
-                selectedPeriodId={historyForwardPeriodId}
-                anchorDate={anchorDate}
-                status={historyForwardStatus}
-                onSelectPeriodId={setHistoryForwardPeriodId}
-              />
+            <div className="space-y-2 xl:pt-1">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(23,32,51,0.12)] bg-[rgba(23,32,51,0.05)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
+                  기준일
+                </span>
+                <span>{anchorDate ? formatDate(anchorDate) : "-"}</span>
+              </div>
+              <div className="grid gap-3">
+                <HistoryComparisonSummary
+                  label="트레일링"
+                  selectedPeriodId={historyTrailingPeriodId}
+                  status={historyTrailingStatus}
+                  onSelectPeriodId={setHistoryTrailingPeriodId}
+                />
+                <HistoryComparisonSummary
+                  label="포워드"
+                  selectedPeriodId={historyForwardPeriodId}
+                  status={historyForwardStatus}
+                  onSelectPeriodId={setHistoryForwardPeriodId}
+                />
+              </div>
             </div>
             <div className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-white/78 px-3 py-2 text-sm font-medium text-[var(--text)]">
               <Switch
@@ -1128,13 +1134,11 @@ function DetailStatusPill({
 function HistoryComparisonSummary({
   label,
   selectedPeriodId,
-  anchorDate,
   status,
   onSelectPeriodId,
 }: {
   label: string;
   selectedPeriodId: PeriodId;
-  anchorDate: string | null;
   status: ComparisonStatus;
   onSelectPeriodId: (periodId: PeriodId) => void;
 }) {
@@ -1161,12 +1165,6 @@ function HistoryComparisonSummary({
             </button>
           ))}
         </div>
-      </div>
-      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(23,32,51,0.12)] bg-[rgba(23,32,51,0.05)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
-        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
-          기준일
-        </span>
-        <span>{anchorDate ? formatDate(anchorDate) : "-"}</span>
       </div>
       {status.hasData ? (
         <div className="flex flex-wrap items-center gap-2">
