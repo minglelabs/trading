@@ -1,15 +1,15 @@
 # trading
 
-여러 시장 데이터/차트 실험용 레포입니다.
+A workspace for market data and charting experiments.
 
-## 프로젝트
+## Projects
 
 - `fear_greed`
-  - 공포탐욕 관련 데이터/시각화 작업
+  - Fear & Greed data and visualization work
 - `ticker_comparison`
-  - 기본값은 `QQQ / TQQQ`이며, 상단 검색으로 다른 2개 티커도 즉시 비교 가능한 Next.js 앱
+  - A Next.js app that defaults to `QQQ / TQQQ` and can compare any two tickers via the header search UI
 
-## 주요 경로
+## Main Path
 
 ```bash
 cd /Users/nam/trading/ticker_comparison
@@ -20,4 +20,4 @@ npm install
 npm run build
 ```
 
-기본 장기 데이터 파일은 각 프로젝트 내부 문서를 참고해 갱신하시면 됩니다.
+Refer to each project README for data refresh and project-specific workflows.

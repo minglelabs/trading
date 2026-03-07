@@ -1,8 +1,8 @@
 # ticker_comparison
 
-`Next.js + React + TypeScript + Tailwind CSS + shadcn/ui` 기반의 2티커 비교 차트 앱입니다. 기본값은 `QQQ / TQQQ`입니다.
+A two-ticker comparison app built with `Next.js + React + TypeScript + Tailwind CSS + shadcn/ui`. The default pair is `QQQ / TQQQ`.
 
-## 기술 스택
+## Tech Stack
 
 - `Next.js 16`
 - `React 19`
@@ -11,46 +11,46 @@
 - `shadcn/ui`
 - `TradingView Lightweight Charts`
 
-## 설치
+## Install
 
 ```bash
 cd /Users/nam/trading/ticker_comparison
 npm install
 ```
 
-## 실행
+## Run
 
-개발 서버:
+Development server:
 
 ```bash
 cd /Users/nam/trading/ticker_comparison
 npm run dev
 ```
 
-프로덕션 빌드 확인:
+Production build check:
 
 ```bash
 cd /Users/nam/trading/ticker_comparison
 npm run build
 ```
 
-## 데이터 갱신
+## Refresh Data
 
 ```bash
 cd /Users/nam/trading/ticker_comparison
 npm run refresh:data
 ```
 
-이 명령은 `Stooq`에서 장기 일봉 데이터를 받아 `public/chart-data.json`을 다시 생성합니다.
+This command downloads long-range daily data from `Stooq` and recreates `public/chart-data.json`.
 
-기본 파일은 `QQQ/TQQQ`만 생성합니다. 다른 티커 조합은 앱 상단 검색에서 필요한 두 종목만 즉시 조회합니다.
+The default local file only contains `QQQ/TQQQ`. Other ticker pairs are fetched on demand from the app header search.
 
-## 동작 방식
+## Behavior
 
-- 상단 검색에서 두 티커를 입력하면, 전체 데이터를 미리 다 받지 않고 입력한 두 종목만 즉시 조회합니다.
-- 상단 `전체 히스토리 차트`는 두 번째 티커의 첫 데이터일 이후만 보여주며, 그 날짜 종가를 두 티커 모두 `100`으로 맞춘 상대지수입니다.
-- 상단 차트를 좌우로 드래그하면 기준 시점이 바뀝니다.
-- 하단에는 선택한 기간(`1M`, `3M`, `6M`, `1Y`, `5Y`)의 trailing 수익률 비교와 forward 수익률 비교 차트가 함께 있습니다.
-- forward 비교는 기준 시점 이후 미래 구간을 보며, 기간이 부족하면 마지막 존재 데이터까지만 사용합니다.
-- 우측 토글로 네비게이터를 `로그 스케일 / 선형 스케일`로 전환할 수 있습니다.
-- 상단 차트 안에는 현재 선택한 두 티커의 범례가 같이 표시됩니다.
+- When you enter two tickers in the header search, the app fetches only that pair instead of preloading every symbol.
+- The top `Full History Chart` starts at the second ticker's first available date and normalizes both tickers to `100` on that date.
+- Dragging the top chart updates the anchor date used by the comparison sections below.
+- The lower sections show trailing return comparison and forward return comparison for the selected window (`1M`, `3M`, `6M`, `1Y`, `5Y`).
+- Forward comparison uses the future window after the anchor date and falls back to the last available date if the full period does not exist.
+- The toggle on the right switches the navigator between `log scale` and `linear scale`.
+- The current ticker pair is shown directly on the chart legends.
