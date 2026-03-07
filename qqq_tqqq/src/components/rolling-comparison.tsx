@@ -1488,6 +1488,7 @@ function createBaseChart(
     },
     localization: {
       locale: "ko-KR",
+      timeFormatter: (time: Time) => timeToDateKey(time),
     },
   });
 }
