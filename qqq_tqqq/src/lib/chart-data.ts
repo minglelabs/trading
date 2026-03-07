@@ -91,7 +91,7 @@ export function normalizeAgainstDate(
   }
 
   const baseValue = rows[baseIndex].value;
-  return rows.map((row) => ({
+  return rows.slice(baseIndex).map((row) => ({
     time: row.time,
     value: roundValue((row.value / baseValue) * 100),
   }));

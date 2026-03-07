@@ -40,9 +40,11 @@ import {
   formatDate,
   formatDateTime,
   formatPercent,
+  getOverlapAnchorDate,
   getLatestCommonDate,
   maxExistingDate,
   minExistingDate,
+  normalizeAgainstDate,
   PERIODS,
   PeriodId,
   subtractMonthsKey,
@@ -80,9 +82,36 @@ export function RollingComparison({
     () => (tickerData ? getLatestCommonDate(tickerData) : null),
     [tickerData]
   );
+  const overlapAnchorDate = useMemo(
+    () => (tickerData ? getOverlapAnchorDate(tickerData) : null),
+    [tickerData]
+  );
+  const navigatorQqqRows = useMemo(
+    () =>
+      tickerData && overlapAnchorDate
+        ? normalizeAgainstDate(tickerData.QQQ.rows, overlapAnchorDate)
+        : [],
+    [overlapAnchorDate, tickerData]
+  );
+  const navigatorTqqqRows = useMemo(
+    () =>
+      tickerData && overlapAnchorDate
+        ? normalizeAgainstDate(tickerData.TQQQ.rows, overlapAnchorDate)
+        : [],
+    [overlapAnchorDate, tickerData]
+  );
   const initialVisibleFrom = useMemo(
-    () => (latestCommonDate ? subtractMonthsKey(latestCommonDate, 60) : null),
-    [latestCommonDate]
+    () => {
+      if (!latestCommonDate || !overlapAnchorDate) {
+        return null;
+      }
+
+      const recentWindowStart = subtractMonthsKey(latestCommonDate, 60);
+      return recentWindowStart < overlapAnchorDate
+        ? overlapAnchorDate
+        : recentWindowStart;
+    },
+    [latestCommonDate, overlapAnchorDate]
   );
 
   const navigatorContainerRef = useRef<HTMLDivElement | null>(null);
@@ -191,6 +220,7 @@ export function RollingComparison({
       !tickerData ||
       !latestCommonDate ||
       !initialVisibleFrom ||
+      !overlapAnchorDate ||
       !navigatorContainerRef.current ||
       !detailContainerRef.current
     ) {
@@ -228,8 +258,8 @@ export function RollingComparison({
       lastValueVisible: true,
     });
 
-    navigatorQqq.setData(tickerData.QQQ.rows as LineData<Time>[]);
-    navigatorTqqq.setData(tickerData.TQQQ.rows as LineData<Time>[]);
+    navigatorQqq.setData(navigatorQqqRows as LineData<Time>[]);
+    navigatorTqqq.setData(navigatorTqqqRows as LineData<Time>[]);
 
     navigatorChartRef.current = navigatorChart;
     detailChartRef.current = detailChart;
@@ -280,6 +310,9 @@ export function RollingComparison({
     initialVisibleFrom,
     latestCommonDate,
     tickerData,
+    navigatorQqqRows,
+    navigatorTqqqRows,
+    overlapAnchorDate,
   ]);
 
   useEffect(() => {
@@ -323,7 +356,7 @@ export function RollingComparison({
     }
   }, [qqqDetailWindow, tqqqDetailWindow]);
 
-  if (!initialData || !tickerData || !latestCommonDate) {
+  if (!initialData || !tickerData || !latestCommonDate || !overlapAnchorDate) {
     return (
       <main className="mx-auto min-h-screen w-[min(1320px,calc(100%-32px))] py-7 sm:py-12">
         <Card className={panelClassName}>
@@ -355,11 +388,12 @@ export function RollingComparison({
             </CardTitle>
             <CardDescription className="max-w-4xl text-base leading-7 text-[var(--muted-text)]">
               위 차트는 TradingView의 공식 차트 라이브러리인 Lightweight
-              Charts로 구성했습니다. 상단 히스토리 차트를 좌우로 드래그하면
+              Charts로 구성했습니다. 상단 전체 히스토리 차트를 좌우로
+              드래그하면
               기준 시점이 바뀌고, 아래의 trailing 수익률 비교가 즉시 다시
-              계산됩니다. 상단 네비게이터는 QQQ와 TQQQ의 장기 가격 흐름을
-              그대로 보여주고, 하단 차트에서만 trailing 수익률 비교를
-              계산합니다.
+              계산됩니다. 상단 전체 히스토리 차트는 TQQQ 상장일 종가를
+              QQQ/TQQQ 모두 100으로 맞춘 상대지수이고, 하단 차트에서만
+              trailing 수익률 비교를 계산합니다.
             </CardDescription>
             <div className="flex flex-wrap gap-2.5">
               <Pill label="QQQ" color={COLORS.QQQ} />
@@ -392,8 +426,8 @@ export function RollingComparison({
           />
           <SummaryCard
             label="데이터 범위"
-            value={`${tickerData.QQQ.firstDate} ~ ${latestCommonDate}`}
-            detail={`TQQQ 데이터 시작일은 ${tickerData.TQQQ.firstDate}입니다. 그 이전 구간은 TQQQ가 비어 있습니다.`}
+            value={`${formatDate(overlapAnchorDate)} ~ ${formatDate(latestCommonDate)}`}
+            detail={`${formatDate(overlapAnchorDate)} 종가를 QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다.`}
           />
           <SummaryCard
             label="마지막 갱신"
@@ -406,11 +440,12 @@ export function RollingComparison({
           <CardHeader className="gap-4 px-6 pt-6 pb-3 md:grid-cols-[1fr_auto] md:items-end">
             <div className="space-y-2">
               <CardTitle className="text-3xl font-semibold tracking-[-0.03em] text-[var(--text)]">
-                전체 히스토리 네비게이터
+                전체 히스토리 차트
               </CardTitle>
               <CardDescription className="max-w-4xl text-[15px] leading-6 text-[var(--muted-text)]">
-                QQQ와 TQQQ의 장기 가격 흐름입니다. 이 차트를 좌우로 움직이면
-                아래 기간별 비교의 기준일이 바뀝니다.
+                TQQQ 상장일인 {formatDate(overlapAnchorDate)} 종가를
+                QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다. 이 차트를 좌우로
+                움직이면 아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
             </div>
             <div className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-white/78 px-3 py-2 text-sm font-medium text-[var(--text)]">
@@ -425,7 +460,11 @@ export function RollingComparison({
             </div>
           </CardHeader>
           <CardContent className="px-3 pb-0 md:px-4">
-            <div className="h-[340px] px-1 pb-6">
+            <div className="relative h-[340px] px-1 pb-6">
+              <div className="pointer-events-none absolute top-4 left-5 z-10 flex flex-wrap gap-2">
+                <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
+                <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
+              </div>
               <div ref={navigatorContainerRef} className={surfaceClassName} />
             </div>
           </CardContent>
@@ -528,6 +567,19 @@ function Pill({ label, color }: { label: string; color: string }) {
       />
       {label}
     </Badge>
+  );
+}
+
+function ChartLegendPill({ label, color }: { label: string; color: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/86 px-3 py-1.5 text-[12px] font-semibold text-[var(--text)] shadow-sm">
+      <span
+        className="h-[3px] w-5 rounded-full"
+        style={{ backgroundColor: color }}
+        aria-hidden="true"
+      />
+      {label}
+    </div>
   );
 }
 
