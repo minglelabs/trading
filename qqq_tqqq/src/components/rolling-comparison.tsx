@@ -622,8 +622,8 @@ export function RollingComparison({
         </section>
 
         <Card className={panelClassName}>
-          <CardHeader className="gap-4 px-6 pt-6 pb-3 md:grid-cols-[1fr_auto] md:items-end">
-            <div className="space-y-2">
+          <CardHeader className="gap-5 px-6 pt-6 pb-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.95fr)_auto] xl:items-start">
+            <div className="space-y-2 xl:max-w-3xl">
               <CardTitle className="text-3xl font-semibold tracking-[-0.03em] text-[var(--text)]">
                 전체 히스토리 차트
               </CardTitle>
@@ -632,6 +632,16 @@ export function RollingComparison({
                 QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다. 이 차트를 좌우로
                 움직이면 아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
+            </div>
+            <div className="grid gap-3 xl:pt-1">
+              <HistoryComparisonSummary
+                label={`트레일링 ${selectedPeriod.label}`}
+                status={detailStatus}
+              />
+              <HistoryComparisonSummary
+                label={`포워드 ${selectedPeriod.label}`}
+                status={forwardStatus}
+              />
             </div>
             <div className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-white/78 px-3 py-2 text-sm font-medium text-[var(--text)]">
               <Switch
@@ -899,6 +909,41 @@ function DetailStatusPill({
         {value === null ? "N/A" : formatPercent(value)}
       </span>
     </span>
+  );
+}
+
+function HistoryComparisonSummary({
+  label,
+  status,
+}: {
+  label: string;
+  status: ComparisonStatus;
+}) {
+  return (
+    <div className="rounded-[22px] border border-[var(--line)] bg-white/72 px-4 py-3 shadow-sm">
+      <p className="mb-2 text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--muted-text)]">
+        {label}
+      </p>
+      {status.hasData ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <DetailStatusPill
+            label="QQQ"
+            value={status.qqq}
+            color={COLORS.QQQ}
+            highlighted={status.highlights.includes("QQQ")}
+          />
+          <span className="text-sm text-[var(--muted-text)]">/</span>
+          <DetailStatusPill
+            label="TQQQ"
+            value={status.tqqq}
+            color={COLORS.TQQQ}
+            highlighted={status.highlights.includes("TQQQ")}
+          />
+        </div>
+      ) : (
+        <p className="text-sm leading-6 text-[var(--muted-text)]">{status.message}</p>
+      )}
+    </div>
   );
 }
 
