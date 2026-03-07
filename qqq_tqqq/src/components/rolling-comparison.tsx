@@ -66,7 +66,7 @@ interface RollingComparisonProps {
 }
 
 const panelClassName =
-  "overflow-hidden rounded-[28px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--shadow)] ring-0";
+  "overflow-visible rounded-[28px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--shadow)] ring-0";
 
 const surfaceClassName =
   "h-full w-full overflow-visible rounded-[20px] border border-[rgba(31,41,55,0.08)] bg-[#fffaf3]";
