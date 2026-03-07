@@ -1069,11 +1069,11 @@ function ChartHoverOverlay({
     >
       <span
         ref={onQqqRef}
-        className="absolute right-1 hidden -translate-y-1/2 rounded-[6px] bg-[#111827] px-2 py-1 text-[13px] font-semibold tracking-[0.01em] text-white shadow-[0_10px_24px_rgba(17,24,39,0.22)]"
+        className="absolute right-1 hidden -translate-y-1/2 rounded-[6px] bg-[#0b6e4f] px-2 py-1 text-[13px] font-semibold tracking-[0.01em] text-white shadow-[0_10px_24px_rgba(11,110,79,0.28)]"
       />
       <span
         ref={onTqqqRef}
-        className="absolute right-1 hidden -translate-y-1/2 rounded-[6px] bg-[#111827] px-2 py-1 text-[13px] font-semibold tracking-[0.01em] text-white shadow-[0_10px_24px_rgba(17,24,39,0.22)]"
+        className="absolute right-1 hidden -translate-y-1/2 rounded-[6px] bg-[#ba181b] px-2 py-1 text-[13px] font-semibold tracking-[0.01em] text-white shadow-[0_10px_24px_rgba(186,24,27,0.28)]"
       />
     </div>
   );
