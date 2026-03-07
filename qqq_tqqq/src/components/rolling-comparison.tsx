@@ -759,13 +759,20 @@ export function RollingComparison({
                 QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다. 이 차트를 좌우로
                 움직이면 아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
-              <p className="text-sm font-medium text-[var(--text)]">
-                기준일:{" "}
-                <span className="text-[var(--muted-text)]">
-                  트레일링 {historyTrailingPeriod.label} / 포워드{" "}
-                  {historyForwardPeriod.label} 모두 {anchorDate ? formatDate(anchorDate) : "-"}
+              <div className="flex flex-wrap items-center gap-2 rounded-[18px] border border-[var(--line)] bg-white/76 px-3 py-3 shadow-sm">
+                <span className="rounded-full bg-[rgba(23,32,51,0.1)] px-2.5 py-1 text-[12px] font-bold tracking-[0.06em] text-[var(--text)]">
+                  기준일
                 </span>
-              </p>
+                <span className="rounded-full border border-[rgba(11,110,79,0.18)] bg-[rgba(11,110,79,0.08)] px-2.5 py-1 text-[12px] font-semibold text-[#0b6e4f]">
+                  트레일링 {historyTrailingPeriod.label}
+                </span>
+                <span className="rounded-full border border-[rgba(186,24,27,0.18)] bg-[rgba(186,24,27,0.08)] px-2.5 py-1 text-[12px] font-semibold text-[#ba181b]">
+                  포워드 {historyForwardPeriod.label}
+                </span>
+                <span className="rounded-full bg-[rgba(23,32,51,0.08)] px-3 py-1 text-sm font-bold text-[var(--text)]">
+                  {anchorDate ? formatDate(anchorDate) : "-"}
+                </span>
+              </div>
             </div>
             <div className="grid gap-3 xl:pt-1">
               <HistoryComparisonSummary
