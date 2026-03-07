@@ -519,7 +519,11 @@ export function RollingComparison({
                 ))}
               </div>
 
-              <div className="h-[420px] px-0 pb-6">
+              <div className="relative h-[420px] px-0 pb-6">
+                <div className="pointer-events-none absolute top-4 left-5 z-10 flex flex-wrap gap-2">
+                  <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
+                  <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
+                </div>
                 <div ref={detailContainerRef} className={surfaceClassName} />
               </div>
             </div>
