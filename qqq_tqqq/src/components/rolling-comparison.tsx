@@ -31,8 +31,10 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import {
+  buildForwardWindowData,
   buildTickerData,
   buildWindowData,
+  calculateForwardReturn,
   calculateTrailingReturn,
   ChartPayload,
   COLORS,
@@ -60,6 +62,14 @@ type ScaleMode = "log" | "linear";
 type SeriesRefs = {
   QQQ: ISeriesApi<"Line"> | null;
   TQQQ: ISeriesApi<"Line"> | null;
+};
+
+type ComparisonStatus = {
+  hasData: boolean;
+  message: string | null;
+  qqq: number | null;
+  tqqq: number | null;
+  highlights: Array<"QQQ" | "TQQQ">;
 };
 
 interface RollingComparisonProps {
@@ -121,10 +131,13 @@ export function RollingComparison({
 
   const navigatorContainerRef = useRef<HTMLDivElement | null>(null);
   const detailContainerRef = useRef<HTMLDivElement | null>(null);
+  const forwardContainerRef = useRef<HTMLDivElement | null>(null);
   const navigatorChartRef = useRef<IChartApi | null>(null);
   const detailChartRef = useRef<IChartApi | null>(null);
+  const forwardChartRef = useRef<IChartApi | null>(null);
   const navigatorSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
   const detailSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
+  const forwardSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<PeriodId>("1y");
   const [navigatorScaleMode, setNavigatorScaleMode] =
@@ -149,6 +162,17 @@ export function RollingComparison({
       tqqq: calculateTrailingReturn(tickerData.TQQQ.rows, anchorDate, period),
     }));
   }, [anchorDate, tickerData]);
+  const forwardPeriodReturns = useMemo(() => {
+    if (!tickerData || !anchorDate) {
+      return [];
+    }
+
+    return PERIODS.map((period) => ({
+      ...period,
+      qqq: calculateForwardReturn(tickerData.QQQ.rows, anchorDate, period),
+      tqqq: calculateForwardReturn(tickerData.TQQQ.rows, anchorDate, period),
+    }));
+  }, [anchorDate, tickerData]);
 
   const qqqDetailWindow = useMemo(() => {
     if (!tickerData || !anchorDate) {
@@ -162,6 +186,18 @@ export function RollingComparison({
       return null;
     }
     return buildWindowData(tickerData.TQQQ.rows, anchorDate, selectedPeriod);
+  }, [anchorDate, selectedPeriod, tickerData]);
+  const qqqForwardWindow = useMemo(() => {
+    if (!tickerData || !anchorDate) {
+      return null;
+    }
+    return buildForwardWindowData(tickerData.QQQ.rows, anchorDate, selectedPeriod);
+  }, [anchorDate, selectedPeriod, tickerData]);
+  const tqqqForwardWindow = useMemo(() => {
+    if (!tickerData || !anchorDate) {
+      return null;
+    }
+    return buildForwardWindowData(tickerData.TQQQ.rows, anchorDate, selectedPeriod);
   }, [anchorDate, selectedPeriod, tickerData]);
 
   const detailRangeLabel = useMemo(() => {
@@ -182,42 +218,35 @@ export function RollingComparison({
   }, [qqqDetailWindow, tqqqDetailWindow]);
 
   const detailStatus = useMemo(() => {
-    if (!qqqDetailWindow && !tqqqDetailWindow) {
-      return {
-        hasData: false,
-        message: "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다.",
-        qqq: null,
-        tqqq: null,
-        highlights: [] as Array<"QQQ" | "TQQQ">,
-      };
-    }
-
-    const qqq = qqqDetailWindow?.returnPct ?? null;
-    const tqqq = tqqqDetailWindow?.returnPct ?? null;
-    let highlights: Array<"QQQ" | "TQQQ"> = [];
-
-    if (qqq !== null && tqqq !== null) {
-      if (qqq > tqqq) {
-        highlights = ["QQQ"];
-      } else if (tqqq > qqq) {
-        highlights = ["TQQQ"];
-      } else {
-        highlights = ["QQQ", "TQQQ"];
-      }
-    } else if (qqq !== null) {
-      highlights = ["QQQ"];
-    } else if (tqqq !== null) {
-      highlights = ["TQQQ"];
-    }
-
-    return {
-      hasData: true,
-      message: null,
-      qqq,
-      tqqq,
-      highlights,
-    };
+    return buildComparisonStatus(
+      qqqDetailWindow?.returnPct ?? null,
+      tqqqDetailWindow?.returnPct ?? null,
+      "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다."
+    );
   }, [qqqDetailWindow, tqqqDetailWindow]);
+  const forwardRangeLabel = useMemo(() => {
+    const start = minExistingDate(
+      qqqForwardWindow?.start ?? null,
+      tqqqForwardWindow?.start ?? null
+    );
+    const end = maxExistingDate(
+      qqqForwardWindow?.end ?? null,
+      tqqqForwardWindow?.end ?? null
+    );
+
+    if (!start || !end) {
+      return "선택 구간 데이터가 없습니다.";
+    }
+
+    return `${formatDate(start)} ~ ${formatDate(end)}`;
+  }, [qqqForwardWindow, tqqqForwardWindow]);
+  const forwardStatus = useMemo(() => {
+    return buildComparisonStatus(
+      qqqForwardWindow?.returnPct ?? null,
+      tqqqForwardWindow?.returnPct ?? null,
+      "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
+    );
+  }, [qqqForwardWindow, tqqqForwardWindow]);
 
   const handleVisibleRangeChange = useEffectEvent((range: IRange<Time> | null) => {
     if (!tickerData || !range || !range.to) {
@@ -292,7 +321,8 @@ export function RollingComparison({
       !initialVisibleFrom ||
       !overlapAnchorDate ||
       !navigatorContainerRef.current ||
-      !detailContainerRef.current
+      !detailContainerRef.current ||
+      !forwardContainerRef.current
     ) {
       return;
     }
@@ -302,6 +332,7 @@ export function RollingComparison({
       NAVIGATOR_HEIGHT
     );
     const detailChart = createBaseChart(detailContainerRef.current, DETAIL_HEIGHT);
+    const forwardChart = createBaseChart(forwardContainerRef.current, DETAIL_HEIGHT);
 
     const navigatorQqq = navigatorChart.addSeries(LineSeries, {
       color: COLORS.QQQ,
@@ -327,14 +358,28 @@ export function RollingComparison({
       priceLineVisible: false,
       lastValueVisible: true,
     });
+    const forwardQqq = forwardChart.addSeries(LineSeries, {
+      color: COLORS.QQQ,
+      lineWidth: 3,
+      priceLineVisible: false,
+      lastValueVisible: true,
+    });
+    const forwardTqqq = forwardChart.addSeries(LineSeries, {
+      color: COLORS.TQQQ,
+      lineWidth: 3,
+      priceLineVisible: false,
+      lastValueVisible: true,
+    });
 
     navigatorQqq.setData(navigatorQqqRows as LineData<Time>[]);
     navigatorTqqq.setData(navigatorTqqqRows as LineData<Time>[]);
 
     navigatorChartRef.current = navigatorChart;
     detailChartRef.current = detailChart;
+    forwardChartRef.current = forwardChart;
     navigatorSeriesRef.current = { QQQ: navigatorQqq, TQQQ: navigatorTqqq };
     detailSeriesRef.current = { QQQ: detailQqq, TQQQ: detailTqqq };
+    forwardSeriesRef.current = { QQQ: forwardQqq, TQQQ: forwardTqqq };
 
     const initialRange = {
       from: toBusinessDay(initialVisibleFrom),
@@ -359,10 +404,17 @@ export function RollingComparison({
           DETAIL_HEIGHT
         );
       }
+      if (forwardContainerRef.current && forwardChartRef.current) {
+        forwardChartRef.current.resize(
+          forwardContainerRef.current.clientWidth,
+          DETAIL_HEIGHT
+        );
+      }
     });
 
     resizeObserver.observe(navigatorContainerRef.current);
     resizeObserver.observe(detailContainerRef.current);
+    resizeObserver.observe(forwardContainerRef.current);
 
     return () => {
       resizeObserver.disconnect();
@@ -371,10 +423,13 @@ export function RollingComparison({
       );
       navigatorChart.remove();
       detailChart.remove();
+      forwardChart.remove();
       navigatorChartRef.current = null;
       detailChartRef.current = null;
+      forwardChartRef.current = null;
       navigatorSeriesRef.current = { QQQ: null, TQQQ: null };
       detailSeriesRef.current = { QQQ: null, TQQQ: null };
+      forwardSeriesRef.current = { QQQ: null, TQQQ: null };
     };
   }, [
     initialVisibleFrom,
@@ -454,6 +509,38 @@ export function RollingComparison({
       });
     }
   }, [qqqDetailWindow, tqqqDetailWindow]);
+  useEffect(() => {
+    if (
+      !forwardChartRef.current ||
+      !forwardSeriesRef.current.QQQ ||
+      !forwardSeriesRef.current.TQQQ
+    ) {
+      return;
+    }
+
+    forwardSeriesRef.current.QQQ.setData(
+      (qqqForwardWindow?.series ?? []) as LineData<Time>[]
+    );
+    forwardSeriesRef.current.TQQQ.setData(
+      (tqqqForwardWindow?.series ?? []) as LineData<Time>[]
+    );
+
+    const from = minExistingDate(
+      qqqForwardWindow?.start ?? null,
+      tqqqForwardWindow?.start ?? null
+    );
+    const to = maxExistingDate(
+      qqqForwardWindow?.end ?? null,
+      tqqqForwardWindow?.end ?? null
+    );
+
+    if (from && to) {
+      forwardChartRef.current.timeScale().setVisibleRange({
+        from: toBusinessDay(from),
+        to: toBusinessDay(to),
+      });
+    }
+  }, [qqqForwardWindow, tqqqForwardWindow]);
 
   if (!initialData || !tickerData || !latestCommonDate || !overlapAnchorDate) {
     return (
@@ -489,10 +576,9 @@ export function RollingComparison({
               위 차트는 TradingView의 공식 차트 라이브러리인 Lightweight
               Charts로 구성했습니다. 상단 전체 히스토리 차트를 좌우로
               드래그하면
-              기준 시점이 바뀌고, 아래의 trailing 수익률 비교가 즉시 다시
-              계산됩니다. 상단 전체 히스토리 차트는 TQQQ 상장일 종가를
-              QQQ/TQQQ 모두 100으로 맞춘 상대지수이고, 하단 차트에서만
-              trailing 수익률 비교를 계산합니다.
+              기준 시점이 바뀌고, 아래의 trailing/forward 수익률 비교가 즉시
+              다시 계산됩니다. 상단 전체 히스토리 차트는 TQQQ 상장일 종가를
+              QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다.
             </CardDescription>
             <div className="flex flex-wrap gap-2.5">
               <Pill label="QQQ" color={COLORS.QQQ} />
@@ -651,6 +737,80 @@ export function RollingComparison({
             구간으로 즉시 전환됩니다.
           </div>
         </Card>
+
+        <Card className={panelClassName}>
+          <CardHeader className="gap-4 px-6 pt-6 pb-3 md:grid-cols-[1fr_auto] md:items-end">
+            <div className="space-y-2">
+              <CardTitle className="text-3xl font-semibold tracking-[-0.03em] text-[var(--text)]">
+                {selectedPeriod.label} forward return comparison
+              </CardTitle>
+              <CardDescription className="text-[15px] leading-6 text-[var(--muted-text)]">
+                {forwardRangeLabel}
+              </CardDescription>
+            </div>
+            {forwardStatus.hasData ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <DetailStatusPill
+                  label="QQQ"
+                  value={forwardStatus.qqq}
+                  color={COLORS.QQQ}
+                  highlighted={forwardStatus.highlights.includes("QQQ")}
+                />
+                <span className="text-sm text-[var(--muted-text)]">/</span>
+                <DetailStatusPill
+                  label="TQQQ"
+                  value={forwardStatus.tqqq}
+                  color={COLORS.TQQQ}
+                  highlighted={forwardStatus.highlights.includes("TQQQ")}
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--muted-text)]">{forwardStatus.message}</p>
+            )}
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <div className="grid gap-5 px-5 pb-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+              <div className="grid content-start gap-2.5">
+                {forwardPeriodReturns.map((period) => (
+                  <button
+                    key={period.id}
+                    type="button"
+                    onClick={() => setSelectedPeriodId(period.id)}
+                    className={[
+                      "grid w-full gap-2 rounded-[18px] border px-4 py-4 text-left transition",
+                      "border-[rgba(31,41,55,0.1)] bg-white/78 hover:-translate-y-px hover:border-[rgba(23,32,51,0.2)]",
+                      selectedPeriodId === period.id
+                        ? "border-[rgba(23,32,51,0.32)] bg-[#fffdf9]"
+                        : "",
+                    ].join(" ")}
+                  >
+                    <span className="text-lg font-semibold text-[var(--text)]">
+                      {period.label}
+                    </span>
+                    <span className={returnClassName(period.qqq)}>
+                      QQQ {period.qqq === null ? "N/A" : formatPercent(period.qqq)}
+                    </span>
+                    <span className={returnClassName(period.tqqq)}>
+                      TQQQ {period.tqqq === null ? "N/A" : formatPercent(period.tqqq)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative h-[420px] px-0 pb-6">
+                <div className="pointer-events-none absolute top-4 left-5 z-10 flex flex-wrap gap-2">
+                  <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
+                  <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
+                </div>
+                <div ref={forwardContainerRef} className={surfaceClassName} />
+              </div>
+            </div>
+          </CardContent>
+          <div className="px-6 pb-6 text-[13px] text-[var(--muted-text)]">
+            기준 시점 이후 미래 구간을 비교합니다. 선택한 기간이 끝까지
+            채워지지 않으면 마지막 존재 데이터까지만 반영됩니다.
+          </div>
+        </Card>
       </section>
     </main>
   );
@@ -740,6 +900,45 @@ function DetailStatusPill({
       </span>
     </span>
   );
+}
+
+function buildComparisonStatus(
+  qqq: number | null,
+  tqqq: number | null,
+  emptyMessage: string
+): ComparisonStatus {
+  if (qqq === null && tqqq === null) {
+    return {
+      hasData: false,
+      message: emptyMessage,
+      qqq: null,
+      tqqq: null,
+      highlights: [],
+    };
+  }
+
+  let highlights: Array<"QQQ" | "TQQQ"> = [];
+  if (qqq !== null && tqqq !== null) {
+    if (qqq > tqqq) {
+      highlights = ["QQQ"];
+    } else if (tqqq > qqq) {
+      highlights = ["TQQQ"];
+    } else {
+      highlights = ["QQQ", "TQQQ"];
+    }
+  } else if (qqq !== null) {
+    highlights = ["QQQ"];
+  } else if (tqqq !== null) {
+    highlights = ["TQQQ"];
+  }
+
+  return {
+    hasData: true,
+    message: null,
+    qqq,
+    tqqq,
+    highlights,
+  };
 }
 
 function returnClassName(value: number | null): string {

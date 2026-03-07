@@ -138,6 +138,47 @@ export function calculateTrailingReturn(
   return window ? window.returnPct : null;
 }
 
+export function buildForwardWindowData(
+  rows: ChartRow[],
+  anchorDate: string,
+  period: Period
+): WindowSeries | null {
+  const startIndex = findIndexOnOrBefore(rows, anchorDate);
+  if (startIndex < 0 || startIndex >= rows.length - 1) {
+    return null;
+  }
+
+  const startDate = rows[startIndex].time;
+  const endTarget = addMonthsKey(startDate, period.months);
+  const endIndex = findIndexOnOrBefore(rows, endTarget);
+
+  if (endIndex <= startIndex) {
+    return null;
+  }
+
+  const base = rows[startIndex].value;
+  const series = rows.slice(startIndex, endIndex + 1).map((row) => ({
+    time: row.time,
+    value: roundValue((row.value / base) * 100),
+  }));
+
+  return {
+    start: startDate,
+    end: rows[endIndex].time,
+    returnPct: ((rows[endIndex].value / base) - 1) * 100,
+    series,
+  };
+}
+
+export function calculateForwardReturn(
+  rows: ChartRow[],
+  anchorDate: string,
+  period: Period
+): number | null {
+  const window = buildForwardWindowData(rows, anchorDate, period);
+  return window ? window.returnPct : null;
+}
+
 export function findNearestCommonDate(
   tickers: Record<TickerSymbol, TickerSeries>,
   targetDate: string
@@ -181,9 +222,17 @@ export function findIndexOnOrBefore(rows: ChartRow[], targetDate: string): numbe
 }
 
 export function subtractMonthsKey(dateKey: string, monthsBack: number): string {
+  return shiftMonthsKey(dateKey, -monthsBack);
+}
+
+export function addMonthsKey(dateKey: string, monthsForward: number): string {
+  return shiftMonthsKey(dateKey, monthsForward);
+}
+
+function shiftMonthsKey(dateKey: string, monthDelta: number): string {
   const source = parseDateKey(dateKey);
   const totalMonths =
-    source.getUTCFullYear() * 12 + source.getUTCMonth() - monthsBack;
+    source.getUTCFullYear() * 12 + source.getUTCMonth() + monthDelta;
   const year = Math.floor(totalMonths / 12);
   const month = totalMonths % 12;
   const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
