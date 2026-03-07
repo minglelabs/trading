@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QQQ / TQQQ Charts</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4efe5;
+        --paper: rgba(255, 251, 245, 0.88);
+        --line: rgba(31, 41, 55, 0.12);
+        --text: #172033;
+        --muted: #536074;
+        --qqq: #0b6e4f;
+        --tqqq: #ba181b;
+        --shadow: 0 24px 60px rgba(23, 32, 51, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Sans KR", "Pretendard Variable", "SUIT",
+          "Apple SD Gothic Neo", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(231, 111, 81, 0.14), transparent 32%),
+          radial-gradient(circle at top right, rgba(42, 157, 143, 0.18), transparent 28%),
+          linear-gradient(180deg, #fcfaf5 0%, var(--bg) 100%);
+      }
+
+      .shell {
+        width: min(1200px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 16px;
+        padding: 28px;
+        margin-bottom: 20px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: var(--paper);
+        backdrop-filter: blur(16px);
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(34px, 6vw, 64px);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 780px;
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.65);
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 20px;
+      }
+
+      .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+        padding: 20px 22px 14px;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: 22px;
+        line-height: 1.1;
+      }
+
+      .card-copy {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .widget-frame {
+        height: 460px;
+      }
+
+      .widget-frame.tall {
+        height: 620px;
+      }
+
+      .tradingview-widget-container {
+        width: 100%;
+        height: 100%;
+      }
+
+      .tradingview-widget-container__widget {
+        width: 100%;
+        height: calc(100% - 40px);
+      }
+
+      .tradingview-widget-copyright {
+        padding: 12px 18px 16px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .tradingview-widget-copyright a {
+        color: inherit;
+      }
+
+      @media (max-width: 900px) {
+        .detail-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .widget-frame.tall {
+          height: 520px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">TradingView Widgets</p>
+        <h1>QQQ / TQQQ 차트</h1>
+        <p>
+          직접 차트를 그리지 않고 TradingView 공식 위젯으로 구성했습니다.
+          위에는 상대 수익률 비교, 아래에는 각 종목의 상세 캔들 차트를 배치했습니다.
+        </p>
+        <div class="pill-row">
+          <span class="pill"><span class="dot" style="background: var(--qqq)"></span>NASDAQ:QQQ</span>
+          <span class="pill"><span class="dot" style="background: var(--tqqq)"></span>NASDAQ:TQQQ</span>
+          <span class="pill">인터넷 연결 필요</span>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">비교 차트</h2>
+              <p class="card-copy">
+                QQQ를 기준으로 TQQQ를 퍼센트 스케일에서 같이 비교합니다.
+              </p>
+            </div>
+          </div>
+          <div class="widget-frame">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <div class="tradingview-widget-copyright">
+                <a
+                  href="https://www.tradingview.com/symbols/NASDAQ-QQQ/?utm_source=local&utm_medium=widget&utm_campaign=symbol-overview"
+                  rel="noopener nofollow"
+                  target="_blank"
+                >
+                  <span>QQQ vs TQQQ</span>
+                </a>
+                <span> by TradingView</span>
+              </div>
+              <script
+                type="text/javascript"
+                src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js"
+                async
+              >
+                {
+                  "symbols": [
+                    [
+                      "Invesco QQQ",
+                      "NASDAQ:QQQ|1D"
+                    ]
+                  ],
+                  "chartOnly": true,
+                  "autosize": true,
+                  "locale": "kr",
+                  "colorTheme": "light",
+                  "showVolume": false,
+                  "showMA": false,
+                  "hideDateRanges": false,
+                  "hideMarketStatus": true,
+                  "hideSymbolLogo": true,
+                  "scalePosition": "right",
+                  "scaleMode": "Percentage",
+                  "fontFamily": "IBM Plex Sans KR, Pretendard Variable, SUIT, Apple SD Gothic Neo, sans-serif",
+                  "fontSize": "12",
+                  "noTimeScale": false,
+                  "valuesTracking": "1",
+                  "changeMode": "price-and-percent",
+                  "chartType": "line",
+                  "lineWidth": 3,
+                  "lineType": 0,
+                  "compareSymbol": {
+                    "symbol": "NASDAQ:TQQQ",
+                    "lineColor": "rgba(186, 24, 27, 1)",
+                    "lineWidth": 3
+                  },
+                  "dateRanges": [
+                    "1m|30",
+                    "3m|60",
+                    "6m|1D",
+                    "12m|1D",
+                    "60m|1W"
+                  ],
+                  "bottomColor": "rgba(255, 255, 255, 0)",
+                  "dateFormat": "yyyy-MM-dd",
+                  "timeHoursFormat": "24-hours"
+                }
+              </script>
+            </div>
+          </div>
+        </article>
+
+        <div class="grid detail-grid">
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">QQQ 상세 차트</h2>
+                <p class="card-copy">
+                  일봉 기준 캔들 차트입니다. 이동평균선과 거래량을 함께 표시합니다.
+                </p>
+              </div>
+            </div>
+            <div class="widget-frame tall">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <div class="tradingview-widget-copyright">
+                  <a
+                    href="https://www.tradingview.com/symbols/NASDAQ-QQQ/?utm_source=local&utm_medium=widget&utm_campaign=advanced-chart"
+                    rel="noopener nofollow"
+                    target="_blank"
+                  >
+                    <span>QQQ stock chart</span>
+                  </a>
+                  <span> by TradingView</span>
+                </div>
+                <script
+                  type="text/javascript"
+                  src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
+                  async
+                >
+                  {
+                    "autosize": true,
+                    "symbol": "NASDAQ:QQQ",
+                    "interval": "D",
+                    "timezone": "exchange",
+                    "theme": "light",
+                    "backgroundColor": "rgba(255, 255, 255, 1)",
+                    "style": "1",
+                    "withdateranges": true,
+                    "hide_side_toolbar": false,
+                    "allow_symbol_change": false,
+                    "save_image": true,
+                    "studies": [
+                      "Volume@tv-basicstudies",
+                      "MASimple@tv-basicstudies"
+                    ],
+                    "locale": "kr",
+                    "calendar": false,
+                    "support_host": "https://www.tradingview.com"
+                  }
+                </script>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">TQQQ 상세 차트</h2>
+                <p class="card-copy">
+                  일봉 기준 캔들 차트입니다. 레버리지 ETF 변동성을 같이 보실 수 있습니다.
+                </p>
+              </div>
+            </div>
+            <div class="widget-frame tall">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <div class="tradingview-widget-copyright">
+                  <a
+                    href="https://www.tradingview.com/symbols/NASDAQ-TQQQ/?utm_source=local&utm_medium=widget&utm_campaign=advanced-chart"
+                    rel="noopener nofollow"
+                    target="_blank"
+                  >
+                    <span>TQQQ stock chart</span>
+                  </a>
+                  <span> by TradingView</span>
+                </div>
+                <script
+                  type="text/javascript"
+                  src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
+                  async
+                >
+                  {
+                    "autosize": true,
+                    "symbol": "NASDAQ:TQQQ",
+                    "interval": "D",
+                    "timezone": "exchange",
+                    "theme": "light",
+                    "backgroundColor": "rgba(255, 255, 255, 1)",
+                    "style": "1",
+                    "withdateranges": true,
+                    "hide_side_toolbar": false,
+                    "allow_symbol_change": false,
+                    "save_image": true,
+                    "studies": [
+                      "Volume@tv-basicstudies",
+                      "MASimple@tv-basicstudies"
+                    ],
+                    "locale": "kr",
+                    "calendar": false,
+                    "support_host": "https://www.tradingview.com"
+                  }
+                </script>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
