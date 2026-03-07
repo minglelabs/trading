@@ -1,0 +1,11 @@
+.DS_Store
+
+# Local editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local shell/dev environment state
+.direnv/
+.devbox/
