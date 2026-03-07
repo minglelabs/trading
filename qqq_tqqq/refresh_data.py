@@ -47,6 +47,10 @@ def main() -> None:
     payload = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "source": "stooq",
+        "symbols": {
+            "QQQ": "QQQ",
+            "TQQQ": "TQQQ",
+        },
         "tickers": tickers,
     }
 

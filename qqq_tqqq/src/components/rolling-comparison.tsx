@@ -41,6 +41,7 @@ import {
   calculateTrailingReturn,
   ChartPayload,
   COLORS,
+  DEFAULT_SYMBOLS,
   findNearestCommonDate,
   findIndexOnOrBefore,
   formatDate,
@@ -103,9 +104,22 @@ const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 export function RollingComparison({
   initialData,
 }: RollingComparisonProps): React.JSX.Element {
+  const [chartData, setChartData] = useState<ChartPayload | null>(initialData);
+  const [isTickerLoading, setIsTickerLoading] = useState(false);
+  const [tickerLoadError, setTickerLoadError] = useState<string | null>(null);
+  const [primaryTickerInput, setPrimaryTickerInput] = useState(
+    initialData?.symbols.QQQ ?? DEFAULT_SYMBOLS.QQQ
+  );
+  const [comparisonTickerInput, setComparisonTickerInput] = useState(
+    initialData?.symbols.TQQQ ?? DEFAULT_SYMBOLS.TQQQ
+  );
+  const activeSymbols = chartData?.symbols ?? DEFAULT_SYMBOLS;
+  const primaryTickerLabel = activeSymbols.QQQ;
+  const comparisonTickerLabel = activeSymbols.TQQQ;
+  const pairTickerLabel = `${primaryTickerLabel}/${comparisonTickerLabel}`;
   const tickerData = useMemo(
-    () => (initialData ? buildTickerData(initialData) : null),
-    [initialData]
+    () => (chartData ? buildTickerData(chartData) : null),
+    [chartData]
   );
   const latestCommonDate = useMemo(
     () => (tickerData ? getLatestCommonDate(tickerData) : null),
@@ -139,10 +153,7 @@ export function RollingComparison({
         return null;
       }
 
-      const recentWindowStart = subtractMonthsKey(latestCommonDate, 60);
-      return recentWindowStart < overlapAnchorDate
-        ? overlapAnchorDate
-        : recentWindowStart;
+      return resolveInitialVisibleFrom(latestCommonDate, overlapAnchorDate);
     },
     [latestCommonDate, overlapAnchorDate]
   );
@@ -277,9 +288,9 @@ export function RollingComparison({
     return buildComparisonStatus(
       qqqDetailWindow?.returnPct ?? null,
       tqqqDetailWindow?.returnPct ?? null,
-      "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다."
+      `선택한 기준일에서는 ${pairTickerLabel} 모두 해당 기간 데이터가 없습니다.`
     );
-  }, [qqqDetailWindow, tqqqDetailWindow]);
+  }, [pairTickerLabel, qqqDetailWindow, tqqqDetailWindow]);
   const forwardRangeLabel = useMemo(() => {
     const start = minExistingDate(
       qqqForwardWindow?.start ?? null,
@@ -300,15 +311,15 @@ export function RollingComparison({
     return buildComparisonStatus(
       qqqForwardWindow?.returnPct ?? null,
       tqqqForwardWindow?.returnPct ?? null,
-      "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
+      `선택한 기준일 이후에는 ${pairTickerLabel} 미래 데이터가 없습니다.`
     );
-  }, [qqqForwardWindow, tqqqForwardWindow]);
+  }, [pairTickerLabel, qqqForwardWindow, tqqqForwardWindow]);
   const historyTrailingStatus = useMemo(() => {
     if (!tickerData || !anchorDate) {
       return buildComparisonStatus(
         null,
         null,
-        "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다."
+        `선택한 기준일에서는 ${pairTickerLabel} 모두 해당 기간 데이터가 없습니다.`
       );
     }
 
@@ -323,15 +334,15 @@ export function RollingComparison({
         anchorDate,
         historyTrailingPeriod
       ),
-      "선택한 기준일에서는 QQQ/TQQQ 모두 해당 기간 데이터가 없습니다."
+      `선택한 기준일에서는 ${pairTickerLabel} 모두 해당 기간 데이터가 없습니다.`
     );
-  }, [anchorDate, historyTrailingPeriod, tickerData]);
+  }, [anchorDate, historyTrailingPeriod, pairTickerLabel, tickerData]);
   const historyForwardStatus = useMemo(() => {
     if (!tickerData || !anchorDate) {
       return buildComparisonStatus(
         null,
         null,
-        "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
+        `선택한 기준일 이후에는 ${pairTickerLabel} 미래 데이터가 없습니다.`
       );
     }
 
@@ -346,9 +357,9 @@ export function RollingComparison({
         anchorDate,
         historyForwardPeriod
       ),
-      "선택한 기준일 이후에는 QQQ/TQQQ 미래 데이터가 없습니다."
+      `선택한 기준일 이후에는 ${pairTickerLabel} 미래 데이터가 없습니다.`
     );
-  }, [anchorDate, historyForwardPeriod, tickerData]);
+  }, [anchorDate, historyForwardPeriod, pairTickerLabel, tickerData]);
   const anchorPickerDateKey =
     anchorPickerDraftDate ||
     anchorDate ||
@@ -470,6 +481,74 @@ export function RollingComparison({
     setAnchorPickerDraftDate(
       clampDateKey(nextDraft, anchorPickerMinDate, anchorPickerMaxDate)
     );
+  };
+
+  const handleTickerSearch = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const primary = primaryTickerInput.trim().toUpperCase();
+    const comparison = comparisonTickerInput.trim().toUpperCase();
+
+    if (!primary || !comparison) {
+      setTickerLoadError("비교할 두 티커를 모두 입력해 주세요.");
+      return;
+    }
+
+    if (primary === comparison) {
+      setTickerLoadError("서로 다른 두 티커를 입력해 주세요.");
+      return;
+    }
+
+    setIsTickerLoading(true);
+    setTickerLoadError(null);
+
+    try {
+      const params = new URLSearchParams({
+        primary,
+        comparison,
+      });
+      const response = await fetch(`/api/history?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as unknown;
+
+      if (!response.ok || !isChartPayload(payload)) {
+        const message =
+          typeof payload === "object" &&
+          payload !== null &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "티커 데이터를 불러오지 못했습니다.";
+        throw new Error(message);
+      }
+
+      const nextChartData = payload;
+      const nextTickerData = buildTickerData(nextChartData);
+      const nextLatestCommonDate = getLatestCommonDate(nextTickerData);
+      const nextOverlapAnchorDate = getOverlapAnchorDate(nextTickerData);
+      const nextInitialVisibleFrom = resolveInitialVisibleFrom(
+        nextLatestCommonDate,
+        nextOverlapAnchorDate
+      );
+
+      startTransition(() => {
+        setChartData(nextChartData);
+        setPrimaryTickerInput(nextChartData.symbols.QQQ);
+        setComparisonTickerInput(nextChartData.symbols.TQQQ);
+        setAnchorDate(nextLatestCommonDate);
+        setVisibleWindowFrom(nextInitialVisibleFrom);
+        setAnchorPickerDraftDate(nextLatestCommonDate);
+        setAnchorPickerMonthKey(getMonthKey(nextLatestCommonDate));
+      });
+      setIsAnchorPickerOpen(false);
+    } catch (error) {
+      setTickerLoadError(
+        error instanceof Error ? error.message : "티커 데이터를 불러오지 못했습니다."
+      );
+    } finally {
+      setIsTickerLoading(false);
+    }
   };
 
   const handleVisibleRangeChange = useEffectEvent((range: IRange<Time> | null) => {
@@ -842,7 +921,7 @@ export function RollingComparison({
     hideHoverOverlay(forwardHoverOverlayRef.current);
   }, [anchorDate, selectedPeriodId]);
 
-  if (!initialData || !tickerData || !latestCommonDate || !overlapAnchorDate) {
+  if (!chartData || !tickerData || !latestCommonDate || !overlapAnchorDate) {
     return (
       <main className="mx-auto min-h-screen w-[min(1320px,calc(100%-32px))] py-7 sm:py-12">
         <Card className={panelClassName}>
@@ -870,19 +949,73 @@ export function RollingComparison({
               TradingView Lightweight Charts
             </p>
             <CardTitle className="text-[clamp(2.125rem,6vw,4rem)] leading-[0.96] font-semibold tracking-[-0.04em] text-[var(--text)]">
-              QQQ / TQQQ Rolling Comparison
+              {primaryTickerLabel} / {comparisonTickerLabel} Rolling Comparison
             </CardTitle>
             <CardDescription className="max-w-4xl text-base leading-7 text-[var(--muted-text)]">
               위 차트는 TradingView의 공식 차트 라이브러리인 Lightweight
               Charts로 구성했습니다. 상단 전체 히스토리 차트를 좌우로
               드래그하면
               기준 시점이 바뀌고, 아래의 trailing/forward 수익률 비교가 즉시
-              다시 계산됩니다. 상단 전체 히스토리 차트는 TQQQ 상장일 종가를
-              QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다.
+              다시 계산됩니다. 상단 전체 히스토리 차트는 {comparisonTickerLabel}
+              최초 데이터일 종가를 {pairTickerLabel} 모두 100으로 맞춘
+              상대지수입니다.
             </CardDescription>
+            <form
+              onSubmit={handleTickerSearch}
+              className="grid gap-2 rounded-[24px] border border-[var(--line)] bg-white/72 p-3 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            >
+              <label className="grid gap-1 text-[11px] font-semibold text-[var(--muted-text)]">
+                기본/첫 번째 티커
+                <input
+                  value={primaryTickerInput}
+                  onChange={(event) =>
+                    setPrimaryTickerInput(event.target.value.toUpperCase())
+                  }
+                  placeholder="QQQ"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  className="h-11 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-semibold uppercase text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)] focus:ring-2 focus:ring-[rgba(23,32,51,0.08)]"
+                />
+              </label>
+              <label className="grid gap-1 text-[11px] font-semibold text-[var(--muted-text)]">
+                비교/두 번째 티커
+                <input
+                  value={comparisonTickerInput}
+                  onChange={(event) =>
+                    setComparisonTickerInput(event.target.value.toUpperCase())
+                  }
+                  placeholder="TQQQ"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  className="h-11 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-semibold uppercase text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)] focus:ring-2 focus:ring-[rgba(23,32,51,0.08)]"
+                />
+              </label>
+              <div className="flex items-end">
+                <Button
+                  type="submit"
+                  className="h-11 w-full rounded-2xl bg-[var(--text)] px-5 text-sm font-semibold text-white hover:bg-[rgba(23,32,51,0.92)] lg:w-auto"
+                  disabled={isTickerLoading}
+                >
+                  {isTickerLoading ? "불러오는 중..." : "티커 불러오기"}
+                </Button>
+              </div>
+              <div className="lg:col-span-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
+                <span className="rounded-full bg-[rgba(23,32,51,0.06)] px-2.5 py-1 text-[var(--muted-text)]">
+                  현재 비교: {pairTickerLabel}
+                </span>
+                <span className="rounded-full bg-[rgba(23,32,51,0.06)] px-2.5 py-1 text-[var(--muted-text)]">
+                  필요한 두 티커만 즉시 조회합니다
+                </span>
+                {tickerLoadError ? (
+                  <span className="rounded-full bg-[rgba(186,24,27,0.08)] px-2.5 py-1 text-[#ba181b]">
+                    {tickerLoadError}
+                  </span>
+                ) : null}
+              </div>
+            </form>
             <div className="flex flex-wrap gap-2.5">
-              <Pill label="QQQ" color={COLORS.QQQ} />
-              <Pill label="TQQQ" color={COLORS.TQQQ} />
+              <Pill label={primaryTickerLabel} color={COLORS.QQQ} />
+              <Pill label={comparisonTickerLabel} color={COLORS.TQQQ} />
               <Badge
                 variant="outline"
                 className="rounded-full border-[var(--line)] bg-white/72 px-3 py-2 text-[13px] font-medium text-[var(--text)]"
@@ -912,12 +1045,12 @@ export function RollingComparison({
           <SummaryCard
             label="데이터 범위"
             value={`${formatDate(overlapAnchorDate)} ~ ${formatDate(latestCommonDate)}`}
-            detail={`${formatDate(overlapAnchorDate)} 종가를 QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다.`}
+            detail={`${formatDate(overlapAnchorDate)} 종가를 ${pairTickerLabel} 모두 100으로 맞춘 상대지수입니다.`}
           />
           <SummaryCard
             label="마지막 갱신"
-            value={formatDateTime(initialData.generatedAt)}
-            detail={`소스: ${initialData.source} / python refresh_data.py 로 다시 생성 가능합니다.`}
+            value={formatDateTime(chartData.generatedAt)}
+            detail={`소스: ${chartData.source} / 기본 QQQ-TQQQ 파일은 python refresh_data.py 로 다시 생성 가능합니다.`}
           />
         </section>
 
@@ -928,9 +1061,9 @@ export function RollingComparison({
                 전체 히스토리 차트
               </CardTitle>
               <CardDescription className="max-w-4xl text-[15px] leading-6 text-[var(--muted-text)]">
-                TQQQ 상장일인 {formatDate(overlapAnchorDate)} 종가를
-                QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다. 이 차트를 좌우로
-                움직이면 아래 기간별 비교의 기준일이 바뀝니다.
+                {comparisonTickerLabel} 최초 데이터일인 {formatDate(overlapAnchorDate)} 종가를
+                {pairTickerLabel} 모두 100으로 맞춘 상대지수입니다. 이 차트를
+                좌우로 움직이면 아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
               <div className="flex flex-wrap items-center gap-2 rounded-[18px] border border-[var(--line)] bg-white/76 px-3 py-3 shadow-sm">
                 <span className="rounded-full bg-[rgba(23,32,51,0.1)] px-2.5 py-1 text-[12px] font-bold tracking-[0.06em] text-[var(--text)]">
@@ -1187,12 +1320,16 @@ export function RollingComparison({
               <div className="grid gap-3">
                 <HistoryComparisonSummary
                   label="트레일링"
+                  primaryLabel={primaryTickerLabel}
+                  comparisonLabel={comparisonTickerLabel}
                   selectedPeriodId={historyTrailingPeriodId}
                   status={historyTrailingStatus}
                   onSelectPeriodId={setHistoryTrailingPeriodId}
                 />
                 <HistoryComparisonSummary
                   label="포워드"
+                  primaryLabel={primaryTickerLabel}
+                  comparisonLabel={comparisonTickerLabel}
                   selectedPeriodId={historyForwardPeriodId}
                   status={historyForwardStatus}
                   onSelectPeriodId={setHistoryForwardPeriodId}
@@ -1213,8 +1350,8 @@ export function RollingComparison({
           <CardContent className="px-3 pb-0 md:px-4">
             <div className="relative h-[340px] px-1 pb-6">
               <div className="pointer-events-none absolute top-4 left-5 z-10 flex flex-wrap gap-2">
-                <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
-                <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
+                <ChartLegendPill label={primaryTickerLabel} color={COLORS.QQQ} />
+                <ChartLegendPill label={comparisonTickerLabel} color={COLORS.TQQQ} />
               </div>
               <ChartHoverOverlay
                 onRootRef={(node) => {
@@ -1249,14 +1386,14 @@ export function RollingComparison({
             {detailStatus.hasData ? (
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <DetailStatusPill
-                  label="QQQ"
+                  label={primaryTickerLabel}
                   value={detailStatus.qqq}
                   color={COLORS.QQQ}
                   highlighted={detailStatus.highlights.includes("QQQ")}
                 />
                 <span className="text-sm text-[var(--muted-text)]">/</span>
                 <DetailStatusPill
-                  label="TQQQ"
+                  label={comparisonTickerLabel}
                   value={detailStatus.tqqq}
                   color={COLORS.TQQQ}
                   highlighted={detailStatus.highlights.includes("TQQQ")}
@@ -1288,12 +1425,13 @@ export function RollingComparison({
                     <span
                       className={returnClassName(period.qqq)}
                     >
-                      QQQ {period.qqq === null ? "N/A" : formatPercent(period.qqq)}
+                      {primaryTickerLabel}{" "}
+                      {period.qqq === null ? "N/A" : formatPercent(period.qqq)}
                     </span>
                     <span
                       className={returnClassName(period.tqqq)}
                     >
-                      TQQQ{" "}
+                      {comparisonTickerLabel}{" "}
                       {period.tqqq === null ? "N/A" : formatPercent(period.tqqq)}
                     </span>
                   </button>
@@ -1302,8 +1440,8 @@ export function RollingComparison({
 
               <div className="relative h-[420px] px-0 pb-6">
                 <div className="pointer-events-none absolute top-4 left-5 z-10 flex flex-wrap gap-2">
-                  <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
-                  <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
+                  <ChartLegendPill label={primaryTickerLabel} color={COLORS.QQQ} />
+                  <ChartLegendPill label={comparisonTickerLabel} color={COLORS.TQQQ} />
                 </div>
                 <ChartHoverOverlay
                   onRootRef={(node) => {
@@ -1339,14 +1477,14 @@ export function RollingComparison({
             {forwardStatus.hasData ? (
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <DetailStatusPill
-                  label="QQQ"
+                  label={primaryTickerLabel}
                   value={forwardStatus.qqq}
                   color={COLORS.QQQ}
                   highlighted={forwardStatus.highlights.includes("QQQ")}
                 />
                 <span className="text-sm text-[var(--muted-text)]">/</span>
                 <DetailStatusPill
-                  label="TQQQ"
+                  label={comparisonTickerLabel}
                   value={forwardStatus.tqqq}
                   color={COLORS.TQQQ}
                   highlighted={forwardStatus.highlights.includes("TQQQ")}
@@ -1376,10 +1514,12 @@ export function RollingComparison({
                       {period.label}
                     </span>
                     <span className={returnClassName(period.qqq)}>
-                      QQQ {period.qqq === null ? "N/A" : formatPercent(period.qqq)}
+                      {primaryTickerLabel}{" "}
+                      {period.qqq === null ? "N/A" : formatPercent(period.qqq)}
                     </span>
                     <span className={returnClassName(period.tqqq)}>
-                      TQQQ {period.tqqq === null ? "N/A" : formatPercent(period.tqqq)}
+                      {comparisonTickerLabel}{" "}
+                      {period.tqqq === null ? "N/A" : formatPercent(period.tqqq)}
                     </span>
                   </button>
                 ))}
@@ -1387,8 +1527,8 @@ export function RollingComparison({
 
               <div className="relative h-[420px] px-0 pb-6">
                 <div className="pointer-events-none absolute top-4 left-5 z-10 flex flex-wrap gap-2">
-                  <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
-                  <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
+                  <ChartLegendPill label={primaryTickerLabel} color={COLORS.QQQ} />
+                  <ChartLegendPill label={comparisonTickerLabel} color={COLORS.TQQQ} />
                 </div>
                 <ChartHoverOverlay
                   onRootRef={(node) => {
@@ -1496,7 +1636,7 @@ function DetailStatusPill({
   color,
   highlighted,
 }: {
-  label: "QQQ" | "TQQQ";
+  label: string;
   value: number | null;
   color: string;
   highlighted: boolean;
@@ -1536,11 +1676,15 @@ function DetailStatusPill({
 
 function HistoryComparisonSummary({
   label,
+  primaryLabel,
+  comparisonLabel,
   selectedPeriodId,
   status,
   onSelectPeriodId,
 }: {
   label: string;
+  primaryLabel: string;
+  comparisonLabel: string;
   selectedPeriodId: PeriodId;
   status: ComparisonStatus;
   onSelectPeriodId: (periodId: PeriodId) => void;
@@ -1572,14 +1716,14 @@ function HistoryComparisonSummary({
       {status.hasData ? (
         <div className="flex flex-wrap items-center gap-2">
           <DetailStatusPill
-            label="QQQ"
+            label={primaryLabel}
             value={status.qqq}
             color={COLORS.QQQ}
             highlighted={status.highlights.includes("QQQ")}
           />
           <span className="text-sm text-[var(--muted-text)]">/</span>
           <DetailStatusPill
-            label="TQQQ"
+            label={comparisonLabel}
             value={status.tqqq}
             color={COLORS.TQQQ}
             highlighted={status.highlights.includes("TQQQ")}
@@ -1659,6 +1803,17 @@ function getReturnTone(value: number | null): { className: string } {
     : {
         className: "text-[#ba181b]",
       };
+}
+
+function isChartPayload(value: unknown): value is ChartPayload {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "tickers" in value &&
+    "symbols" in value &&
+    "generatedAt" in value &&
+    "source" in value
+  );
 }
 
 function isTextEditingElement(target: Element | null): boolean {
@@ -1917,6 +2072,16 @@ function toBusinessDay(dateKey: string): Time {
     month,
     day,
   };
+}
+
+function resolveInitialVisibleFrom(
+  latestCommonDate: string,
+  overlapAnchorDate: string
+): string {
+  const recentWindowStart = subtractMonthsKey(latestCommonDate, 60);
+  return recentWindowStart < overlapAnchorDate
+    ? overlapAnchorDate
+    : recentWindowStart;
 }
 
 function buildYearOptions(minDateKey: string, maxDateKey: string): number[] {

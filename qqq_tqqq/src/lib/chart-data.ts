@@ -4,6 +4,7 @@ export type PeriodId = "1m" | "3m" | "6m" | "1y" | "5y";
 export interface ChartPayload {
   generatedAt: string;
   source: string;
+  symbols: Record<TickerSymbol, string>;
   tickers: Record<TickerSymbol, TickerPayload>;
 }
 
@@ -51,6 +52,25 @@ export const COLORS: Record<TickerSymbol, string> = {
   QQQ: "#0b6e4f",
   TQQQ: "#ba181b",
 };
+
+export const DEFAULT_SYMBOLS: Record<TickerSymbol, string> = {
+  QQQ: "QQQ",
+  TQQQ: "TQQQ",
+};
+
+export function withDefaultSymbols(
+  payload: Omit<ChartPayload, "symbols"> & {
+    symbols?: Partial<Record<TickerSymbol, string>>;
+  }
+): ChartPayload {
+  return {
+    ...payload,
+    symbols: {
+      QQQ: payload.symbols?.QQQ?.toUpperCase() || DEFAULT_SYMBOLS.QQQ,
+      TQQQ: payload.symbols?.TQQQ?.toUpperCase() || DEFAULT_SYMBOLS.TQQQ,
+    },
+  };
+}
 
 export function buildTickerData(
   payload: ChartPayload
