@@ -42,6 +42,7 @@
     detailWindow: document.getElementById("detail-window"),
     detailStatus: document.getElementById("detail-status"),
     navigatorChart: document.getElementById("navigator-chart"),
+    navigatorLogScale: document.getElementById("navigator-log-scale"),
     detailChart: document.getElementById("detail-chart"),
     generatedAt: document.getElementById("generated-at"),
     dataRange: document.getElementById("data-range"),
@@ -51,13 +52,14 @@
   const state = {
     selectedPeriodId: "1y",
     anchorDate: latestCommonDate,
+    navigatorScaleMode: "log",
   };
 
   elements.generatedAt.textContent = formatDateTime(dataPayload.generatedAt);
   elements.dataRange.textContent =
     `${tickerData.QQQ.firstDate} ~ ${latestCommonDate}`;
   elements.coverage.textContent =
-    `TQQQ 상장일은 ${tickerData.TQQQ.firstDate}입니다. 이보다 이전 기준일에서는 TQQQ 수익률이 비어 있습니다.`;
+    `상단 네비게이터는 ${tickerData.TQQQ.firstDate} 종가를 QQQ/TQQQ 모두 100으로 맞춘 누적 상대지수입니다. 이보다 이전 기준일에서는 TQQQ 수익률이 비어 있습니다.`;
 
   const navigatorChart = createBaseChart(elements.navigatorChart, 340);
   const detailChart = createBaseChart(elements.detailChart, 420);
@@ -96,9 +98,7 @@
   navigatorSeries.TQQQ.setData(
     normalizeAgainstDate(tickerData.TQQQ.rows, overlapAnchorDate)
   );
-  navigatorChart.priceScale("right").applyOptions({
-    mode: LightweightCharts.PriceScaleMode.Logarithmic,
-  });
+  applyNavigatorScale();
 
   navigatorChart.timeScale().setVisibleRange({
     from: toBusinessDay(subtractMonthsKey(latestCommonDate, 60)),
@@ -121,6 +121,12 @@
 
     state.anchorDate = nextAnchor;
     updateAll();
+  });
+
+  elements.navigatorLogScale.checked = true;
+  elements.navigatorLogScale.addEventListener("change", (event) => {
+    state.navigatorScaleMode = event.target.checked ? "log" : "linear";
+    applyNavigatorScale();
   });
 
   window.addEventListener("resize", () => {
@@ -171,6 +177,15 @@
     elements.detailWindow.textContent = selectedRange
       ? `${formatDate(selectedRange.start)} ~ ${formatDate(selectedRange.end)}`
       : "선택 구간 데이터가 없습니다.";
+  }
+
+  function applyNavigatorScale() {
+    navigatorChart.priceScale("right").applyOptions({
+      mode:
+        state.navigatorScaleMode === "log"
+          ? LightweightCharts.PriceScaleMode.Logarithmic
+          : LightweightCharts.PriceScaleMode.Normal,
+    });
   }
 
   function updatePeriodCards() {
