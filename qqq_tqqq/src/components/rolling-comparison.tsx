@@ -1099,7 +1099,6 @@ function DetailStatusPill({
       </span>
       <span
         className={[
-          "rounded-full px-2.5 py-0.5",
           highlighted ? "text-[15px] font-bold" : "font-semibold",
           returnTone.className,
         ].join(" ")}
@@ -1224,19 +1223,16 @@ function returnClassName(value: number | null): string {
 function getReturnTone(value: number | null): { className: string } {
   if (value === null) {
     return {
-      className:
-        "bg-[rgba(71,85,105,0.08)] text-[#475569]",
+      className: "text-[#475569]",
     };
   }
 
   return value >= 0
     ? {
-        className:
-          "bg-[rgba(11,110,79,0.12)] text-[#0b6e4f]",
+        className: "text-[#0b6e4f]",
       }
     : {
-        className:
-          "bg-[rgba(186,24,27,0.12)] text-[#ba181b]",
+        className: "text-[#ba181b]",
       };
 }
 
