@@ -103,6 +103,7 @@ const surfaceClassName =
   "h-full w-full overflow-visible rounded-[20px] border border-[rgba(31,41,55,0.08)] bg-[#fffaf3]";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const LAST_SELECTED_PAIR_KEY = "ticker-comparison:last-selected-pair";
 
 export function RollingComparison({
   initialData,
@@ -198,6 +199,10 @@ export function RollingComparison({
   });
   const primaryInputRef = useRef<HTMLDivElement | null>(null);
   const comparisonInputRef = useRef<HTMLDivElement | null>(null);
+  const restoredSavedPairRef = useRef(false);
+  const loadPairDataRef = useRef<
+    (primary: string, comparison: string) => Promise<void>
+  >(async () => {});
   const anchorPickerRef = useRef<HTMLDivElement | null>(null);
   const anchorPickerInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -499,6 +504,69 @@ export function RollingComparison({
     );
   };
 
+  const persistSelectedPair = (primary: string, comparison: string) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    params.set("primary", primary);
+    params.set("comparison", comparison);
+    const nextQuery = params.toString();
+    const nextUrl = nextQuery
+      ? `${window.location.pathname}?${nextQuery}`
+      : window.location.pathname;
+    window.history.replaceState(null, "", nextUrl);
+    window.localStorage.setItem(
+      LAST_SELECTED_PAIR_KEY,
+      JSON.stringify({ primary, comparison })
+    );
+  };
+
+  const loadPairData = async (primary: string, comparison: string) => {
+    const params = new URLSearchParams({
+      primary,
+      comparison,
+    });
+    const response = await fetch(`/api/history?${params.toString()}`, {
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as unknown;
+
+    if (!response.ok || !isChartPayload(payload)) {
+      const message =
+        typeof payload === "object" &&
+        payload !== null &&
+        "error" in payload &&
+        typeof payload.error === "string"
+          ? payload.error
+          : "티커 데이터를 불러오지 못했습니다.";
+      throw new Error(message);
+    }
+
+    const nextChartData = payload;
+    const nextTickerData = buildTickerData(nextChartData);
+    const nextLatestCommonDate = getLatestCommonDate(nextTickerData);
+    const nextOverlapAnchorDate = getOverlapAnchorDate(nextTickerData);
+    const nextInitialVisibleFrom = resolveInitialVisibleFrom(
+      nextLatestCommonDate,
+      nextOverlapAnchorDate
+    );
+
+    startTransition(() => {
+      setChartData(nextChartData);
+      setPrimaryTickerInput(nextChartData.symbols.QQQ);
+      setComparisonTickerInput(nextChartData.symbols.TQQQ);
+      setAnchorDate(nextLatestCommonDate);
+      setVisibleWindowFrom(nextInitialVisibleFrom);
+      setAnchorPickerDraftDate(nextLatestCommonDate);
+      setAnchorPickerMonthKey(getMonthKey(nextLatestCommonDate));
+    });
+    setIsAnchorPickerOpen(false);
+    persistSelectedPair(nextChartData.symbols.QQQ, nextChartData.symbols.TQQQ);
+  };
+  loadPairDataRef.current = loadPairData;
+
   const handleTickerSearch = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -520,45 +588,7 @@ export function RollingComparison({
     setActiveSuggestionField(null);
 
     try {
-      const params = new URLSearchParams({
-        primary,
-        comparison,
-      });
-      const response = await fetch(`/api/history?${params.toString()}`, {
-        cache: "no-store",
-      });
-      const payload = (await response.json()) as unknown;
-
-      if (!response.ok || !isChartPayload(payload)) {
-        const message =
-          typeof payload === "object" &&
-          payload !== null &&
-          "error" in payload &&
-          typeof payload.error === "string"
-            ? payload.error
-            : "티커 데이터를 불러오지 못했습니다.";
-        throw new Error(message);
-      }
-
-      const nextChartData = payload;
-      const nextTickerData = buildTickerData(nextChartData);
-      const nextLatestCommonDate = getLatestCommonDate(nextTickerData);
-      const nextOverlapAnchorDate = getOverlapAnchorDate(nextTickerData);
-      const nextInitialVisibleFrom = resolveInitialVisibleFrom(
-        nextLatestCommonDate,
-        nextOverlapAnchorDate
-      );
-
-      startTransition(() => {
-        setChartData(nextChartData);
-        setPrimaryTickerInput(nextChartData.symbols.QQQ);
-        setComparisonTickerInput(nextChartData.symbols.TQQQ);
-        setAnchorDate(nextLatestCommonDate);
-        setVisibleWindowFrom(nextInitialVisibleFrom);
-        setAnchorPickerDraftDate(nextLatestCommonDate);
-        setAnchorPickerMonthKey(getMonthKey(nextLatestCommonDate));
-      });
-      setIsAnchorPickerOpen(false);
+      await loadPairData(primary, comparison);
     } catch (error) {
       setTickerLoadError(
         error instanceof Error ? error.message : "티커 데이터를 불러오지 못했습니다."
@@ -977,6 +1007,71 @@ export function RollingComparison({
       document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [activeSuggestionField]);
+
+  useEffect(() => {
+    if (restoredSavedPairRef.current || typeof window === "undefined") {
+      return;
+    }
+
+    restoredSavedPairRef.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const primaryFromUrl = params.get("primary")?.trim().toUpperCase();
+    const comparisonFromUrl = params.get("comparison")?.trim().toUpperCase();
+
+    if (primaryFromUrl && comparisonFromUrl) {
+      window.localStorage.setItem(
+        LAST_SELECTED_PAIR_KEY,
+        JSON.stringify({
+          primary: primaryFromUrl,
+          comparison: comparisonFromUrl,
+        })
+      );
+      return;
+    }
+
+    const savedPair = window.localStorage.getItem(LAST_SELECTED_PAIR_KEY);
+    if (!savedPair) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(savedPair) as {
+        primary?: string;
+        comparison?: string;
+      };
+      const primary = parsed.primary?.trim().toUpperCase();
+      const comparison = parsed.comparison?.trim().toUpperCase();
+
+      if (
+        !primary ||
+        !comparison ||
+        primary === comparison ||
+        (primary === primaryTickerLabel && comparison === comparisonTickerLabel)
+      ) {
+        return;
+      }
+
+      setIsTickerLoading(true);
+      setTickerLoadError(null);
+      setPrimaryTickerInput(primary);
+      setComparisonTickerInput(comparison);
+
+      void loadPairDataRef.current(primary, comparison)
+        .catch((error) => {
+          setTickerLoadError(
+            error instanceof Error
+              ? error.message
+              : "티커 데이터를 불러오지 못했습니다."
+          );
+        })
+        .finally(() => {
+          setIsTickerLoading(false);
+        });
+    } catch {
+      window.localStorage.removeItem(LAST_SELECTED_PAIR_KEY);
+    }
+  }, [comparisonTickerLabel, primaryTickerLabel]);
 
   useEffect(() => {
     if (!navigatorChartRef.current) {
