@@ -17,6 +17,7 @@ import {
   LineData,
   LineSeries,
   LineStyle,
+  MouseEventParams,
   PriceScaleMode,
   Time,
 } from "lightweight-charts";
@@ -70,6 +71,13 @@ type ComparisonStatus = {
   qqq: number | null;
   tqqq: number | null;
   highlights: Array<"QQQ" | "TQQQ">;
+};
+
+type HoverOverlayElementRefs = {
+  root: HTMLDivElement | null;
+  date: HTMLParagraphElement | null;
+  qqq: HTMLSpanElement | null;
+  tqqq: HTMLSpanElement | null;
 };
 
 interface RollingComparisonProps {
@@ -138,6 +146,24 @@ export function RollingComparison({
   const navigatorSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
   const detailSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
   const forwardSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
+  const navigatorHoverOverlayRef = useRef<HoverOverlayElementRefs>({
+    root: null,
+    date: null,
+    qqq: null,
+    tqqq: null,
+  });
+  const detailHoverOverlayRef = useRef<HoverOverlayElementRefs>({
+    root: null,
+    date: null,
+    qqq: null,
+    tqqq: null,
+  });
+  const forwardHoverOverlayRef = useRef<HoverOverlayElementRefs>({
+    root: null,
+    date: null,
+    qqq: null,
+    tqqq: null,
+  });
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<PeriodId>("6m");
   const [navigatorScaleMode, setNavigatorScaleMode] =
@@ -313,6 +339,33 @@ export function RollingComparison({
       to: toBusinessDay(navigatorDateKeys[nextEndIndex]),
     });
   });
+  const handleNavigatorCrosshairMove = useEffectEvent(
+    (param: MouseEventParams<Time>) => {
+      syncHoverOverlay(
+        navigatorHoverOverlayRef.current,
+        param,
+        navigatorSeriesRef.current
+      );
+    }
+  );
+  const handleDetailCrosshairMove = useEffectEvent(
+    (param: MouseEventParams<Time>) => {
+      syncHoverOverlay(
+        detailHoverOverlayRef.current,
+        param,
+        detailSeriesRef.current
+      );
+    }
+  );
+  const handleForwardCrosshairMove = useEffectEvent(
+    (param: MouseEventParams<Time>) => {
+      syncHoverOverlay(
+        forwardHoverOverlayRef.current,
+        param,
+        forwardSeriesRef.current
+      );
+    }
+  );
 
   useEffect(() => {
     if (
@@ -389,7 +442,14 @@ export function RollingComparison({
     navigatorChart.timeScale().subscribeVisibleTimeRangeChange(
       handleVisibleRangeChange
     );
+    navigatorChart.subscribeCrosshairMove(handleNavigatorCrosshairMove);
+    detailChart.subscribeCrosshairMove(handleDetailCrosshairMove);
+    forwardChart.subscribeCrosshairMove(handleForwardCrosshairMove);
     handleVisibleRangeChange(initialRange);
+
+    const navigatorHoverOverlay = navigatorHoverOverlayRef.current;
+    const detailHoverOverlay = detailHoverOverlayRef.current;
+    const forwardHoverOverlay = forwardHoverOverlayRef.current;
 
     const resizeObserver = new ResizeObserver(() => {
       if (navigatorContainerRef.current && navigatorChartRef.current) {
@@ -421,6 +481,12 @@ export function RollingComparison({
       navigatorChart.timeScale().unsubscribeVisibleTimeRangeChange(
         handleVisibleRangeChange
       );
+      navigatorChart.unsubscribeCrosshairMove(handleNavigatorCrosshairMove);
+      detailChart.unsubscribeCrosshairMove(handleDetailCrosshairMove);
+      forwardChart.unsubscribeCrosshairMove(handleForwardCrosshairMove);
+      hideHoverOverlay(navigatorHoverOverlay);
+      hideHoverOverlay(detailHoverOverlay);
+      hideHoverOverlay(forwardHoverOverlay);
       navigatorChart.remove();
       detailChart.remove();
       forwardChart.remove();
@@ -541,6 +607,11 @@ export function RollingComparison({
       });
     }
   }, [qqqForwardWindow, tqqqForwardWindow]);
+  useEffect(() => {
+    hideHoverOverlay(navigatorHoverOverlayRef.current);
+    hideHoverOverlay(detailHoverOverlayRef.current);
+    hideHoverOverlay(forwardHoverOverlayRef.current);
+  }, [anchorDate, selectedPeriodId]);
 
   if (!initialData || !tickerData || !latestCommonDate || !overlapAnchorDate) {
     return (
@@ -660,6 +731,20 @@ export function RollingComparison({
                 <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
                 <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
               </div>
+              <ChartHoverOverlay
+                onRootRef={(node) => {
+                  navigatorHoverOverlayRef.current.root = node;
+                }}
+                onDateRef={(node) => {
+                  navigatorHoverOverlayRef.current.date = node;
+                }}
+                onQqqRef={(node) => {
+                  navigatorHoverOverlayRef.current.qqq = node;
+                }}
+                onTqqqRef={(node) => {
+                  navigatorHoverOverlayRef.current.tqqq = node;
+                }}
+              />
               <div ref={navigatorContainerRef} className={surfaceClassName} />
             </div>
           </CardContent>
@@ -738,6 +823,20 @@ export function RollingComparison({
                   <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
                   <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
                 </div>
+                <ChartHoverOverlay
+                  onRootRef={(node) => {
+                    detailHoverOverlayRef.current.root = node;
+                  }}
+                  onDateRef={(node) => {
+                    detailHoverOverlayRef.current.date = node;
+                  }}
+                  onQqqRef={(node) => {
+                    detailHoverOverlayRef.current.qqq = node;
+                  }}
+                  onTqqqRef={(node) => {
+                    detailHoverOverlayRef.current.tqqq = node;
+                  }}
+                />
                 <div ref={detailContainerRef} className={surfaceClassName} />
               </div>
             </div>
@@ -812,6 +911,20 @@ export function RollingComparison({
                   <ChartLegendPill label="QQQ" color={COLORS.QQQ} />
                   <ChartLegendPill label="TQQQ" color={COLORS.TQQQ} />
                 </div>
+                <ChartHoverOverlay
+                  onRootRef={(node) => {
+                    forwardHoverOverlayRef.current.root = node;
+                  }}
+                  onDateRef={(node) => {
+                    forwardHoverOverlayRef.current.date = node;
+                  }}
+                  onQqqRef={(node) => {
+                    forwardHoverOverlayRef.current.qqq = node;
+                  }}
+                  onTqqqRef={(node) => {
+                    forwardHoverOverlayRef.current.tqqq = node;
+                  }}
+                />
                 <div ref={forwardContainerRef} className={surfaceClassName} />
               </div>
             </div>
@@ -871,6 +984,37 @@ function ChartLegendPill({ label, color }: { label: string; color: string }) {
         aria-hidden="true"
       />
       {label}
+    </div>
+  );
+}
+
+function ChartHoverOverlay({
+  onRootRef,
+  onDateRef,
+  onQqqRef,
+  onTqqqRef,
+}: {
+  onRootRef: (node: HTMLDivElement | null) => void;
+  onDateRef: (node: HTMLParagraphElement | null) => void;
+  onQqqRef: (node: HTMLSpanElement | null) => void;
+  onTqqqRef: (node: HTMLSpanElement | null) => void;
+}) {
+  return (
+    <div
+      ref={onRootRef}
+      className="pointer-events-none absolute top-4 right-5 z-10 hidden max-w-[calc(100%-40px)] flex-col items-end gap-2"
+    >
+      <p ref={onDateRef} className="rounded-full border border-[var(--line)] bg-white/90 px-3 py-1 text-[12px] font-semibold text-[var(--text)] shadow-sm" />
+      <div className="flex flex-wrap justify-end gap-2">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/92 px-3 py-1.5 text-sm font-medium text-[var(--text)] shadow-sm">
+          <span className="font-bold text-[#0b6e4f]">QQQ</span>
+          <span ref={onQqqRef} />
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/92 px-3 py-1.5 text-sm font-medium text-[var(--text)] shadow-sm">
+          <span className="font-bold text-[#ba181b]">TQQQ</span>
+          <span ref={onTqqqRef} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -1025,6 +1169,65 @@ function hexToRgba(hex: string, alpha: number): string {
   const blue = parseInt(fullHex.slice(4, 6), 16);
 
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function syncHoverOverlay(
+  overlayRefs: HoverOverlayElementRefs,
+  param: MouseEventParams<Time>,
+  seriesRefs: SeriesRefs
+): void {
+  if (
+    !overlayRefs.root ||
+    !overlayRefs.date ||
+    !overlayRefs.qqq ||
+    !overlayRefs.tqqq
+  ) {
+    return;
+  }
+
+  if (!param.point || !param.time || !seriesRefs.QQQ || !seriesRefs.TQQQ) {
+    hideHoverOverlay(overlayRefs);
+    return;
+  }
+
+  const qqqValue = getLineValue(param.seriesData.get(seriesRefs.QQQ));
+  const tqqqValue = getLineValue(param.seriesData.get(seriesRefs.TQQQ));
+
+  if (qqqValue === null && tqqqValue === null) {
+    hideHoverOverlay(overlayRefs);
+    return;
+  }
+
+  overlayRefs.root.style.display = "flex";
+  overlayRefs.date.textContent = formatDate(timeToDateKey(param.time));
+  overlayRefs.qqq.textContent = qqqValue === null ? "N/A" : formatHoverValue(qqqValue);
+  overlayRefs.tqqq.textContent = tqqqValue === null ? "N/A" : formatHoverValue(tqqqValue);
+}
+
+function hideHoverOverlay(overlayRefs: HoverOverlayElementRefs): void {
+  if (overlayRefs.root) {
+    overlayRefs.root.style.display = "none";
+  }
+}
+
+function getLineValue(data: unknown): number | null {
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "value" in data &&
+    typeof data.value === "number"
+  ) {
+    return data.value;
+  }
+
+  return null;
+}
+
+function formatHoverValue(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 function createBaseChart(
