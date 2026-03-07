@@ -139,7 +139,7 @@ export function RollingComparison({
   const detailSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
   const forwardSeriesRef = useRef<SeriesRefs>({ QQQ: null, TQQQ: null });
 
-  const [selectedPeriodId, setSelectedPeriodId] = useState<PeriodId>("1y");
+  const [selectedPeriodId, setSelectedPeriodId] = useState<PeriodId>("6m");
   const [navigatorScaleMode, setNavigatorScaleMode] =
     useState<ScaleMode>("log");
   const [anchorDate, setAnchorDate] = useState<string | null>(latestCommonDate);
