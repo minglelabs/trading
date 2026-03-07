@@ -1,0 +1,73 @@
+//@version=5
+indicator("Momentum-Volatility F&G Index", shorttitle="MV F&G", format=format.price, precision=2)
+
+// --- 입력 설정 ---
+
+// 모멘텀 설정
+mom_ma_len = input.int(125, title="모멘텀: 이평선 기간")
+mom_min_range = input.float(-5.0, title="모멘텀: 최소 범위 (%)")
+mom_max_range = input.float(5.0, title="모멘텀: 최대 범위 (%)")
+
+// 변동성 설정
+vol_len = input.int(7, title="변동성: 계산 기간")
+vol_norm_len = input.int(252, title="변동성: 정규화 기간")
+
+// 최종 가중치
+w_momentum = input.float(0.5, title="가중치: 모멘텀", minval=0, maxval=1, step=0.1)
+w_volatility = input.float(0.5, title="가중치: 변동성", minval=0, maxval=1, step=0.1)
+
+
+// --- 1. 모멘텀 지표 계산 ---
+sma_val = ta.sma(close, mom_ma_len)
+momentum_pct = ((close - sma_val) / sma_val) * 100
+
+// 고정 범위로 스케일링 (0-100)
+range = mom_max_range - mom_min_range
+scaled_momentum = range == 0 ? 50 : (momentum_pct - mom_min_range) / range * 100
+scaled_momentum := math.max(0, math.min(100, scaled_momentum)) // 0과 100 사이로 값 제한 (Clip)
+
+
+// --- 2. 변동성 지표 계산 ---
+daily_return = ta.change(close) / close[1]
+volatility = ta.stdev(daily_return, vol_len)
+
+// 동적 범위로 스케일링 (0-100)
+min_vol = ta.lowest(volatility, vol_norm_len)
+max_vol = ta.highest(volatility, vol_norm_len)
+vol_range = max_vol - min_vol
+scaled_volatility = vol_range == 0 ? 50 : (volatility - min_vol) / vol_range * 100
+
+// 변동성은 높을수록 '공포'이므로 척도를 뒤집음 (Invert)
+inverted_scaled_volatility = 100 - scaled_volatility
+
+
+// --- 3. 최종 지수 계산 ---
+totalWeight = w_momentum + w_volatility
+final_index = totalWeight > 0 ? (scaled_momentum * w_momentum + inverted_scaled_volatility * w_volatility) / totalWeight : 50
+
+
+// --- 차트 출력 ---
+plot(final_index, title="MV F&G Index", color=color.new(color.purple, 0))
+hline(0, "Extreme Fear", color.red)
+hline(25, "Fear", color.orange)
+hline(50, "Neutral", color.gray)
+hline(75, "Greed", color.lime)
+hline(100, "Extreme Greed", color.green)
+
+
+// --- 테이블 출력 ---
+var fng_table = table.new(position.top_right, 2, 4, border_width = 1)
+if barstate.islast
+    fng_color = final_index > 75 ? #008000 : final_index > 50 ? #32CD32 : final_index < 25 ? #8B0000 : final_index < 50 ? #FF8C00 : color.gray
+    
+    table.cell(fng_table, 0, 0, "항목", bgcolor=color.new(color.gray, 0), text_color=color.white, width=25)
+    table.cell(fng_table, 1, 0, "값 (0-100)", bgcolor=color.new(color.gray, 0), text_color=color.white)
+
+    table.cell(fng_table, 0, 1, "최종 F&G 지수", bgcolor=fng_color, text_color=color.white)
+    table.cell(fng_table, 1, 1, str.tostring(final_index, '#.##'), bgcolor=fng_color, text_color=color.white)
+
+    table.cell(fng_table, 0, 2, "모멘텀 지표", bgcolor=color.new(color.blue, 30), text_color=color.white)
+    table.cell(fng_table, 1, 2, str.tostring(scaled_momentum, '#.##'), bgcolor=color.new(color.blue, 30), text_color=color.white)
+
+    table.cell(fng_table, 0, 3, "변동성 지표 (반전)", bgcolor=color.new(color.red, 30), text_color=color.white)
+    table.cell(fng_table, 1, 3, str.tostring(inverted_scaled_volatility, '#.##'), bgcolor=color.new(color.red, 30), text_color=color.white)
