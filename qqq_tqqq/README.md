@@ -1,32 +1,52 @@
 # qqq_tqqq
 
-QQQ, TQQQ 장기 데이터 비교용 작업 폴더입니다.
+`Next.js + React + TypeScript + Tailwind CSS + shadcn/ui` 기반의 QQQ/TQQQ 비교 차트 앱입니다.
 
-## 파일
+## 기술 스택
 
-- `refresh_data.py`: `Stooq`에서 QQQ, TQQQ 장기 데이터를 받아 `chart-data.js` 생성
-- `chart-data.js`: 브라우저에서 바로 읽는 정적 데이터 파일
-- `app.js`: TradingView Lightweight Charts 기반 비교 로직
-- `index.html`: 로컬에서 바로 여는 차트 페이지
+- `Next.js 16`
+- `React 19`
+- `TypeScript`
+- `Tailwind CSS 4`
+- `shadcn/ui`
+- `TradingView Lightweight Charts`
 
-## 사용 방법
-
-데이터 갱신:
+## 설치
 
 ```bash
 cd /Users/nam/trading/qqq_tqqq
-python refresh_data.py
+npm install
 ```
 
-차트 열기:
+## 실행
+
+개발 서버:
 
 ```bash
-open /Users/nam/trading/qqq_tqqq/index.html
+cd /Users/nam/trading/qqq_tqqq
+npm run dev
 ```
+
+프로덕션 빌드 확인:
+
+```bash
+cd /Users/nam/trading/qqq_tqqq
+npm run build
+```
+
+## 데이터 갱신
+
+```bash
+cd /Users/nam/trading/qqq_tqqq
+npm run refresh:data
+```
+
+이 명령은 `Stooq`에서 장기 일봉 데이터를 받아 `public/chart-data.json`을 다시 생성합니다.
 
 ## 동작 방식
 
-- 상단 차트는 전체 히스토리 네비게이터입니다.
+- 상단 네비게이터는 `QQQ`와 `TQQQ`를 모두 `TQQQ` 상장일 종가=`100`으로 맞춘 누적 상대지수입니다.
 - 상단 차트를 좌우로 드래그하면 기준 시점이 바뀝니다.
 - 하단은 선택한 기간(`1M`, `3M`, `6M`, `1Y`, `5Y`)의 trailing 수익률 비교 차트입니다.
+- 우측 토글로 네비게이터를 `로그 스케일 / 선형 스케일`로 전환할 수 있습니다.
 - `TQQQ`는 2010년 상장이라 그 이전 구간은 `N/A`가 나올 수 있습니다.

@@ -10,7 +10,7 @@ from urllib.request import urlopen
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
-OUTPUT_PATH = ROOT / "chart-data.js"
+OUTPUT_PATH = ROOT / "public" / "chart-data.json"
 TICKERS = ("QQQ", "TQQQ")
 STOOQ_URL = "https://stooq.com/q/d/l/?s={symbol}.us&i=d"
 
@@ -50,8 +50,9 @@ def main() -> None:
         "tickers": tickers,
     }
 
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(
-        "window.QQQ_TQQQ_DATA = " + json.dumps(payload, separators=(",", ":")) + ";\n",
+        json.dumps(payload, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
 

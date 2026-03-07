@@ -1,0 +1,83 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #fcfaf5;
+  --foreground: #172033;
+  --card: rgba(255, 251, 245, 0.94);
+  --card-foreground: #172033;
+  --popover: #fffaf3;
+  --popover-foreground: #172033;
+  --primary: #1f2937;
+  --primary-foreground: #fffaf3;
+  --secondary: #f2ede4;
+  --secondary-foreground: #172033;
+  --muted: #f2ede4;
+  --muted-foreground: #536074;
+  --accent: #f7f2ea;
+  --accent-foreground: #172033;
+  --destructive: #ba181b;
+  --border: rgba(31, 41, 55, 0.12);
+  --input: rgba(31, 41, 55, 0.16);
+  --ring: rgba(23, 32, 51, 0.2);
+  --radius: 1.75rem;
+  --line: rgba(31, 41, 55, 0.12);
+  --paper: rgba(255, 251, 245, 0.94);
+  --text: #172033;
+  --muted-text: #536074;
+  --shadow: 0 24px 60px rgba(23, 32, 51, 0.08);
+}
+
+@theme inline {
+  --font-sans: var(--font-ibm-plex);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply min-h-screen bg-background text-foreground;
+    background:
+      radial-gradient(circle at top left, rgba(231, 111, 81, 0.14), transparent 32%),
+      radial-gradient(circle at top right, rgba(42, 157, 143, 0.18), transparent 28%),
+      linear-gradient(180deg, #fcfaf5 0%, #f4efe5 100%);
+  }
+
+  ::selection {
+    background: rgba(23, 32, 51, 0.14);
+  }
+}
