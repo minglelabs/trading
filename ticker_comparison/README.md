@@ -1,4 +1,4 @@
-# qqq_tqqq
+# ticker_comparison
 
 `Next.js + React + TypeScript + Tailwind CSS + shadcn/ui` 기반의 2티커 비교 차트 앱입니다. 기본값은 `QQQ / TQQQ`입니다.
 
@@ -14,7 +14,7 @@
 ## 설치
 
 ```bash
-cd /Users/nam/trading/qqq_tqqq
+cd /Users/nam/trading/ticker_comparison
 npm install
 ```
 
@@ -23,21 +23,21 @@ npm install
 개발 서버:
 
 ```bash
-cd /Users/nam/trading/qqq_tqqq
+cd /Users/nam/trading/ticker_comparison
 npm run dev
 ```
 
 프로덕션 빌드 확인:
 
 ```bash
-cd /Users/nam/trading/qqq_tqqq
+cd /Users/nam/trading/ticker_comparison
 npm run build
 ```
 
 ## 데이터 갱신
 
 ```bash
-cd /Users/nam/trading/qqq_tqqq
+cd /Users/nam/trading/ticker_comparison
 npm run refresh:data
 ```
 

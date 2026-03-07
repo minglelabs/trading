@@ -42,7 +42,7 @@ async function fetchHistory(ticker: string): Promise<TickerPayload> {
   const response = await fetch(url, {
     cache: "no-store",
     headers: {
-      "user-agent": "qqq-tqqq-comparison/1.0",
+      "user-agent": "ticker-comparison/1.0",
     },
   });
 
