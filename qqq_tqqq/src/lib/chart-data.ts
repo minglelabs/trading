@@ -217,23 +217,21 @@ export function timeToDateKey(
 }
 
 export function formatDate(dateKey: string): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(parseDateKey(dateKey));
+  const [year, month, day] = dateKey.split("-");
+  return formatKoreanDateLabel(year, month, day);
 }
 
 export function formatDateTime(dateTime: string): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Seoul",
-  }).format(new Date(dateTime));
+  const parsed = new Date(dateTime);
+  if (Number.isNaN(parsed.getTime())) {
+    return dateTime;
+  }
+
+  const { year, month, day, hour, minute } = getTimeZoneParts(
+    parsed,
+    "Asia/Seoul"
+  );
+  return `${formatKoreanDateLabel(year, month, day)} ${hour}:${minute}`;
 }
 
 export function formatPercent(value: number): string {
@@ -267,4 +265,43 @@ export function maxExistingDate(a: string | null, b: string | null): string | nu
 
 function roundValue(value: number): number {
   return Number(value.toFixed(4));
+}
+
+function formatKoreanDateLabel(
+  year: string,
+  month: string,
+  day: string
+): string {
+  return `${Number(year)}년 ${Number(month)}월 ${Number(day)}일`;
+}
+
+function getTimeZoneParts(
+  date: Date,
+  timeZone: string
+): Record<"year" | "month" | "day" | "hour" | "minute", string> {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const values: Record<"year" | "month" | "day" | "hour" | "minute", string> = {
+    year: "",
+    month: "",
+    day: "",
+    hour: "",
+    minute: "",
+  };
+
+  for (const part of formatter.formatToParts(date)) {
+    if (part.type in values) {
+      values[part.type as keyof typeof values] = part.value;
+    }
+  }
+
+  return values;
 }
