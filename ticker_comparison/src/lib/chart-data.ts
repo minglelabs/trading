@@ -98,7 +98,9 @@ export function getLatestCommonDate(
 export function getOverlapAnchorDate(
   tickers: Record<TickerSymbol, TickerSeries>
 ): string {
-  return tickers.TQQQ.rows[0].time;
+  return tickers.QQQ.rows[0].time >= tickers.TQQQ.rows[0].time
+    ? tickers.QQQ.rows[0].time
+    : tickers.TQQQ.rows[0].time;
 }
 
 export function normalizeAgainstDate(

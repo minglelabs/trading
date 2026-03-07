@@ -48,7 +48,7 @@ The default local file only contains `QQQ/TQQQ`. Other ticker pairs are fetched 
 ## Behavior
 
 - When you enter two tickers in the header search, the app fetches only that pair instead of preloading every symbol.
-- The top `Full History Chart` starts at the second ticker's first available date and normalizes both tickers to `100` on that date.
+- The top `Full History Chart` starts at the first common date shared by both tickers and normalizes both tickers to `100` on that date.
 - Dragging the top chart updates the anchor date used by the comparison sections below.
 - The lower sections show trailing return comparison and forward return comparison for the selected window (`1M`, `3M`, `6M`, `1Y`, `5Y`).
 - Forward comparison uses the future window after the anchor date and falls back to the last available date if the full period does not exist.

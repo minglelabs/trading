@@ -1,7 +1,20 @@
 import { ChartPayload, TickerPayload, withDefaultSymbols } from "@/lib/chart-data";
 
 const STOOQ_URL = "https://stooq.com/q/d/l/";
+const NASDAQ_SEARCH_URL = "https://api.nasdaq.com/api/autocomplete/slookup/10";
 const TICKER_PATTERN = /^[A-Za-z][A-Za-z0-9.-]{0,14}$/;
+const SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
+const suggestionCache = new Map<
+  string,
+  { fetchedAt: number; items: TickerSuggestion[] }
+>();
+
+export interface TickerSuggestion {
+  symbol: string;
+  name: string;
+  exchange: string;
+  asset: string;
+}
 
 export function normalizeTickerInput(value: string): string | null {
   const normalized = value.trim().toUpperCase();
@@ -32,6 +45,62 @@ export async function fetchPairHistory(
       TQQQ: comparison,
     },
   });
+}
+
+export async function fetchTickerSuggestions(
+  query: string
+): Promise<TickerSuggestion[]> {
+  const normalized = query.trim().toUpperCase();
+  if (!normalized) {
+    return [];
+  }
+
+  const cached = suggestionCache.get(normalized);
+  if (cached && Date.now() - cached.fetchedAt < SUGGESTION_CACHE_TTL_MS) {
+    return cached.items;
+  }
+
+  const url = new URL(NASDAQ_SEARCH_URL);
+  url.searchParams.set("search", normalized);
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "user-agent": "Mozilla/5.0 ticker-comparison/1.0",
+      accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Ticker suggestions are unavailable right now.");
+  }
+
+  const payload = (await response.json()) as {
+    data?: Array<{
+      symbol?: string;
+      name?: string;
+      exchange?: string;
+      asset?: string;
+    }>;
+  };
+
+  const items = (payload.data ?? [])
+    .filter((item) => typeof item.symbol === "string" && item.symbol.length > 0)
+    .map((item) => ({
+      symbol: item.symbol!.toUpperCase(),
+      name: item.name?.trim() || "-",
+      exchange: item.exchange?.trim() || "-",
+      asset: item.asset?.trim() || "-",
+    }))
+    .filter((item) => item.symbol.includes(normalized))
+    .slice(0, 8);
+
+  suggestionCache.set(normalized, {
+    fetchedAt: Date.now(),
+    items,
+  });
+
+  return items;
 }
 
 async function fetchHistory(ticker: string): Promise<TickerPayload> {

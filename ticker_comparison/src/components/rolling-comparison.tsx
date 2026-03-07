@@ -57,6 +57,7 @@ import {
   subtractMonthsKey,
   timeToDateKey,
 } from "@/lib/chart-data";
+import type { TickerSuggestion } from "@/lib/stooq";
 
 const NAVIGATOR_HEIGHT = 340;
 const DETAIL_HEIGHT = 420;
@@ -89,6 +90,8 @@ type CalendarCell = {
   disabled: boolean;
 };
 
+type SuggestionField = "primary" | "comparison";
+
 interface RollingComparisonProps {
   initialData: ChartPayload | null;
 }
@@ -113,6 +116,17 @@ export function RollingComparison({
   const [comparisonTickerInput, setComparisonTickerInput] = useState(
     initialData?.symbols.TQQQ ?? DEFAULT_SYMBOLS.TQQQ
   );
+  const [primarySuggestions, setPrimarySuggestions] = useState<TickerSuggestion[]>(
+    []
+  );
+  const [comparisonSuggestions, setComparisonSuggestions] = useState<
+    TickerSuggestion[]
+  >([]);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [loadingSuggestionField, setLoadingSuggestionField] =
+    useState<SuggestionField | null>(null);
+  const [activeSuggestionField, setActiveSuggestionField] =
+    useState<SuggestionField | null>(null);
   const activeSymbols = chartData?.symbols ?? DEFAULT_SYMBOLS;
   const primaryTickerLabel = activeSymbols.QQQ;
   const comparisonTickerLabel = activeSymbols.TQQQ;
@@ -182,6 +196,8 @@ export function RollingComparison({
     qqq: null,
     tqqq: null,
   });
+  const primaryInputRef = useRef<HTMLDivElement | null>(null);
+  const comparisonInputRef = useRef<HTMLDivElement | null>(null);
   const anchorPickerRef = useRef<HTMLDivElement | null>(null);
   const anchorPickerInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -501,6 +517,7 @@ export function RollingComparison({
 
     setIsTickerLoading(true);
     setTickerLoadError(null);
+    setActiveSuggestionField(null);
 
     try {
       const params = new URLSearchParams({
@@ -549,6 +566,22 @@ export function RollingComparison({
     } finally {
       setIsTickerLoading(false);
     }
+  };
+
+  const applyTickerSuggestion = (
+    field: SuggestionField,
+    suggestion: TickerSuggestion
+  ) => {
+    if (field === "primary") {
+      setPrimaryTickerInput(suggestion.symbol);
+      setPrimarySuggestions([]);
+    } else {
+      setComparisonTickerInput(suggestion.symbol);
+      setComparisonSuggestions([]);
+    }
+
+    setSuggestionError(null);
+    setActiveSuggestionField(null);
   };
 
   const handleVisibleRangeChange = useEffectEvent((range: IRange<Time> | null) => {
@@ -815,6 +848,137 @@ export function RollingComparison({
   }, [isAnchorPickerOpen]);
 
   useEffect(() => {
+    const query = primaryTickerInput.trim();
+    if (query.length === 0) {
+      setPrimarySuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        setLoadingSuggestionField("primary");
+        const response = await fetch(
+          `/api/symbol-search?q=${encodeURIComponent(query)}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+        const payload = (await response.json()) as {
+          items?: TickerSuggestion[];
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Ticker suggestions are unavailable.");
+        }
+
+        setPrimarySuggestions(payload.items ?? []);
+        setSuggestionError(null);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setPrimarySuggestions([]);
+        setSuggestionError(
+          error instanceof Error
+            ? error.message
+            : "Ticker suggestions are unavailable."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingSuggestionField((current) =>
+            current === "primary" ? null : current
+          );
+        }
+      }
+    }, 180);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [primaryTickerInput]);
+
+  useEffect(() => {
+    const query = comparisonTickerInput.trim();
+    if (query.length === 0) {
+      setComparisonSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        setLoadingSuggestionField("comparison");
+        const response = await fetch(
+          `/api/symbol-search?q=${encodeURIComponent(query)}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+        const payload = (await response.json()) as {
+          items?: TickerSuggestion[];
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Ticker suggestions are unavailable.");
+        }
+
+        setComparisonSuggestions(payload.items ?? []);
+        setSuggestionError(null);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setComparisonSuggestions([]);
+        setSuggestionError(
+          error instanceof Error
+            ? error.message
+            : "Ticker suggestions are unavailable."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingSuggestionField((current) =>
+            current === "comparison" ? null : current
+          );
+        }
+      }
+    }, 180);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [comparisonTickerInput]);
+
+  useEffect(() => {
+    if (!activeSuggestionField) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      const isInsidePrimary =
+        !!primaryInputRef.current && primaryInputRef.current.contains(target);
+      const isInsideComparison =
+        !!comparisonInputRef.current && comparisonInputRef.current.contains(target);
+
+      if (!isInsidePrimary && !isInsideComparison) {
+        setActiveSuggestionField(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [activeSuggestionField]);
+
+  useEffect(() => {
     if (!navigatorChartRef.current) {
       return;
     }
@@ -956,40 +1120,76 @@ export function RollingComparison({
               Charts로 구성했습니다. 상단 전체 히스토리 차트를 좌우로
               드래그하면
               기준 시점이 바뀌고, 아래의 trailing/forward 수익률 비교가 즉시
-              다시 계산됩니다. 상단 전체 히스토리 차트는 {comparisonTickerLabel}
-              최초 데이터일 종가를 {pairTickerLabel} 모두 100으로 맞춘
+              다시 계산됩니다. 상단 전체 히스토리 차트는 두 티커의 공통 시작일
+              종가를 {pairTickerLabel} 모두 100으로 맞춘
               상대지수입니다.
             </CardDescription>
             <form
               onSubmit={handleTickerSearch}
               className="grid gap-2 rounded-[24px] border border-[var(--line)] bg-white/72 p-3 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
             >
-              <label className="grid gap-1 text-[11px] font-semibold text-[var(--muted-text)]">
-                기본/첫 번째 티커
+              <div
+                ref={primaryInputRef}
+                className="relative grid gap-1 text-[11px] font-semibold text-[var(--muted-text)]"
+              >
+                <label htmlFor="primary-ticker">기본/첫 번째 티커</label>
                 <input
+                  id="primary-ticker"
                   value={primaryTickerInput}
-                  onChange={(event) =>
-                    setPrimaryTickerInput(event.target.value.toUpperCase())
-                  }
+                  onFocus={() => setActiveSuggestionField("primary")}
+                  onChange={(event) => {
+                    setPrimaryTickerInput(event.target.value.toUpperCase());
+                    setActiveSuggestionField("primary");
+                  }}
                   placeholder="QQQ"
                   autoCapitalize="characters"
                   spellCheck={false}
+                  autoComplete="off"
                   className="h-11 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-semibold uppercase text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)] focus:ring-2 focus:ring-[rgba(23,32,51,0.08)]"
                 />
-              </label>
-              <label className="grid gap-1 text-[11px] font-semibold text-[var(--muted-text)]">
-                비교/두 번째 티커
+                {activeSuggestionField === "primary" &&
+                (primaryTickerInput.trim().length > 0 ||
+                  loadingSuggestionField === "primary") ? (
+                  <TickerSuggestionList
+                    suggestions={primarySuggestions}
+                    loading={loadingSuggestionField === "primary"}
+                    onSelect={(suggestion) =>
+                      applyTickerSuggestion("primary", suggestion)
+                    }
+                  />
+                ) : null}
+              </div>
+              <div
+                ref={comparisonInputRef}
+                className="relative grid gap-1 text-[11px] font-semibold text-[var(--muted-text)]"
+              >
+                <label htmlFor="comparison-ticker">비교/두 번째 티커</label>
                 <input
+                  id="comparison-ticker"
                   value={comparisonTickerInput}
-                  onChange={(event) =>
-                    setComparisonTickerInput(event.target.value.toUpperCase())
-                  }
+                  onFocus={() => setActiveSuggestionField("comparison")}
+                  onChange={(event) => {
+                    setComparisonTickerInput(event.target.value.toUpperCase());
+                    setActiveSuggestionField("comparison");
+                  }}
                   placeholder="TQQQ"
                   autoCapitalize="characters"
                   spellCheck={false}
+                  autoComplete="off"
                   className="h-11 rounded-2xl border border-[rgba(23,32,51,0.12)] bg-white px-3 text-sm font-semibold uppercase text-[var(--text)] outline-none transition focus:border-[rgba(23,32,51,0.24)] focus:ring-2 focus:ring-[rgba(23,32,51,0.08)]"
                 />
-              </label>
+                {activeSuggestionField === "comparison" &&
+                (comparisonTickerInput.trim().length > 0 ||
+                  loadingSuggestionField === "comparison") ? (
+                  <TickerSuggestionList
+                    suggestions={comparisonSuggestions}
+                    loading={loadingSuggestionField === "comparison"}
+                    onSelect={(suggestion) =>
+                      applyTickerSuggestion("comparison", suggestion)
+                    }
+                  />
+                ) : null}
+              </div>
               <div className="flex items-end">
                 <Button
                   type="submit"
@@ -1006,6 +1206,11 @@ export function RollingComparison({
                 <span className="rounded-full bg-[rgba(23,32,51,0.06)] px-2.5 py-1 text-[var(--muted-text)]">
                   필요한 두 티커만 즉시 조회합니다
                 </span>
+                {suggestionError ? (
+                  <span className="rounded-full bg-[rgba(23,32,51,0.06)] px-2.5 py-1 text-[var(--muted-text)]">
+                    자동완성 일시 오류
+                  </span>
+                ) : null}
                 {tickerLoadError ? (
                   <span className="rounded-full bg-[rgba(186,24,27,0.08)] px-2.5 py-1 text-[#ba181b]">
                     {tickerLoadError}
@@ -1045,7 +1250,7 @@ export function RollingComparison({
           <SummaryCard
             label="데이터 범위"
             value={`${formatDate(overlapAnchorDate)} ~ ${formatDate(latestCommonDate)}`}
-            detail={`${formatDate(overlapAnchorDate)} 종가를 ${pairTickerLabel} 모두 100으로 맞춘 상대지수입니다.`}
+            detail={`${formatDate(overlapAnchorDate)} 공통 시작일 종가를 ${pairTickerLabel} 모두 100으로 맞춘 상대지수입니다.`}
           />
           <SummaryCard
             label="마지막 갱신"
@@ -1061,7 +1266,7 @@ export function RollingComparison({
                 전체 히스토리 차트
               </CardTitle>
               <CardDescription className="max-w-4xl text-[15px] leading-6 text-[var(--muted-text)]">
-                {comparisonTickerLabel} 최초 데이터일인 {formatDate(overlapAnchorDate)} 종가를
+                두 티커의 공통 시작일인 {formatDate(overlapAnchorDate)} 종가를
                 {pairTickerLabel} 모두 100으로 맞춘 상대지수입니다. 이 차트를
                 좌우로 움직이면 아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
@@ -1600,6 +1805,53 @@ function ChartLegendPill({ label, color }: { label: string; color: string }) {
         aria-hidden="true"
       />
       {label}
+    </div>
+  );
+}
+
+function TickerSuggestionList({
+  suggestions,
+  loading,
+  onSelect,
+}: {
+  suggestions: TickerSuggestion[];
+  loading: boolean;
+  onSelect: (suggestion: TickerSuggestion) => void;
+}) {
+  return (
+    <div className="absolute top-full left-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-[22px] border border-[rgba(23,32,51,0.12)] bg-[#fffdf8] p-2 shadow-[0_18px_40px_rgba(16,24,40,0.14)]">
+      {loading ? (
+        <div className="rounded-2xl px-3 py-3 text-xs font-medium text-[var(--muted-text)]">
+          Searching symbols...
+        </div>
+      ) : suggestions.length === 0 ? (
+        <div className="rounded-2xl px-3 py-3 text-xs font-medium text-[var(--muted-text)]">
+          No matching symbols.
+        </div>
+      ) : (
+        <div className="grid gap-1">
+          {suggestions.map((suggestion) => (
+            <button
+              key={`${suggestion.symbol}-${suggestion.exchange}-${suggestion.asset}`}
+              type="button"
+              onClick={() => onSelect(suggestion)}
+              className="grid gap-0.5 rounded-2xl px-3 py-2 text-left transition hover:bg-[rgba(23,32,51,0.06)]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-bold text-[var(--text)]">
+                  {suggestion.symbol}
+                </span>
+                <span className="text-[11px] font-semibold text-[var(--muted-text)]">
+                  {suggestion.exchange}
+                </span>
+              </div>
+              <div className="truncate text-[12px] font-medium text-[var(--muted-text)]">
+                {suggestion.name}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
