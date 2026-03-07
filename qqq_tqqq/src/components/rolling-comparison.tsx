@@ -759,6 +759,13 @@ export function RollingComparison({
                 QQQ/TQQQ 모두 100으로 맞춘 상대지수입니다. 이 차트를 좌우로
                 움직이면 아래 기간별 비교의 기준일이 바뀝니다.
               </CardDescription>
+              <p className="text-sm font-medium text-[var(--text)]">
+                기준일:{" "}
+                <span className="text-[var(--muted-text)]">
+                  트레일링 {historyTrailingPeriod.label} / 포워드{" "}
+                  {historyForwardPeriod.label} 모두 {anchorDate ? formatDate(anchorDate) : "-"}
+                </span>
+              </p>
             </div>
             <div className="grid gap-3 xl:pt-1">
               <HistoryComparisonSummary
