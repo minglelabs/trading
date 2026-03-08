@@ -16,7 +16,6 @@ If you are starting here for the first time, `ticker_comparison` is the easiest 
 | --- | --- | --- |
 | `ticker_comparison` | A web app for comparing two US tickers. The default pair is `QQQ / TQQQ`. | First-time users |
 | `fear_greed` | Fear & Greed data and visualization work. | Users working on separate analysis tasks |
-| `qqq_tqqq` | Experimental asset-comparison work. | Internal reference |
 
 ## Quick Start For Non-Developers
 
