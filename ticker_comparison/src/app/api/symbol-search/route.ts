@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { fetchTickerSuggestions } from "@/lib/stooq";
+import {
+  fetchTickerSuggestions,
+  MIN_TICKER_SUGGESTION_QUERY_LENGTH,
+} from "@/lib/stooq";
 
 export async function GET(request: NextRequest) {
   const query = (request.nextUrl.searchParams.get("q") ?? "").trim();
 
   if (!query) {
-    return NextResponse.json({ items: [] });
+    return NextResponse.json({
+      startsWith: [],
+      contains: [],
+      minQueryLength: MIN_TICKER_SUGGESTION_QUERY_LENGTH,
+    });
   }
 
   try {
-    const items = await fetchTickerSuggestions(query);
+    const groups = await fetchTickerSuggestions(query);
     return NextResponse.json(
-      { items },
+      {
+        ...groups,
+        minQueryLength: MIN_TICKER_SUGGESTION_QUERY_LENGTH,
+      },
       {
         headers: {
           "cache-control": "no-store",
@@ -25,6 +35,14 @@ export async function GET(request: NextRequest) {
         ? error.message
         : "Ticker suggestions are unavailable right now.";
 
-    return NextResponse.json({ error: message, items: [] }, { status: 502 });
+    return NextResponse.json(
+      {
+        error: message,
+        startsWith: [],
+        contains: [],
+        minQueryLength: MIN_TICKER_SUGGESTION_QUERY_LENGTH,
+      },
+      { status: 502 }
+    );
   }
 }

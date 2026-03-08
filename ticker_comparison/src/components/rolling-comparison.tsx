@@ -57,7 +57,11 @@ import {
   subtractMonthsKey,
   timeToDateKey,
 } from "@/lib/chart-data";
-import type { TickerSuggestion } from "@/lib/stooq";
+import {
+  MIN_TICKER_SUGGESTION_QUERY_LENGTH,
+  type TickerSuggestion,
+  type TickerSuggestionGroups,
+} from "@/lib/stooq";
 
 const NAVIGATOR_HEIGHT = 340;
 const DETAIL_HEIGHT = 420;
@@ -104,6 +108,10 @@ const surfaceClassName =
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const LAST_SELECTED_PAIR_KEY = "ticker-comparison:last-selected-pair";
+const EMPTY_SUGGESTION_GROUPS: TickerSuggestionGroups = {
+  startsWith: [],
+  contains: [],
+};
 
 export function RollingComparison({
   initialData,
@@ -117,12 +125,11 @@ export function RollingComparison({
   const [comparisonTickerInput, setComparisonTickerInput] = useState(
     initialData?.symbols.TQQQ ?? DEFAULT_SYMBOLS.TQQQ
   );
-  const [primarySuggestions, setPrimarySuggestions] = useState<TickerSuggestion[]>(
-    []
-  );
+  const [primarySuggestions, setPrimarySuggestions] =
+    useState<TickerSuggestionGroups>(EMPTY_SUGGESTION_GROUPS);
   const [comparisonSuggestions, setComparisonSuggestions] = useState<
-    TickerSuggestion[]
-  >([]);
+    TickerSuggestionGroups
+  >(EMPTY_SUGGESTION_GROUPS);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [loadingSuggestionField, setLoadingSuggestionField] =
     useState<SuggestionField | null>(null);
@@ -604,10 +611,10 @@ export function RollingComparison({
   ) => {
     if (field === "primary") {
       setPrimaryTickerInput(suggestion.symbol);
-      setPrimarySuggestions([]);
+      setPrimarySuggestions(EMPTY_SUGGESTION_GROUPS);
     } else {
       setComparisonTickerInput(suggestion.symbol);
-      setComparisonSuggestions([]);
+      setComparisonSuggestions(EMPTY_SUGGESTION_GROUPS);
     }
 
     setSuggestionError(null);
@@ -880,7 +887,14 @@ export function RollingComparison({
   useEffect(() => {
     const query = primaryTickerInput.trim();
     if (query.length === 0) {
-      setPrimarySuggestions([]);
+      setPrimarySuggestions(EMPTY_SUGGESTION_GROUPS);
+      setSuggestionError(null);
+      return;
+    }
+
+    if (query.length < MIN_TICKER_SUGGESTION_QUERY_LENGTH) {
+      setPrimarySuggestions(EMPTY_SUGGESTION_GROUPS);
+      setSuggestionError(null);
       return;
     }
 
@@ -896,7 +910,8 @@ export function RollingComparison({
           }
         );
         const payload = (await response.json()) as {
-          items?: TickerSuggestion[];
+          startsWith?: TickerSuggestion[];
+          contains?: TickerSuggestion[];
           error?: string;
         };
 
@@ -904,13 +919,16 @@ export function RollingComparison({
           throw new Error(payload.error || "Ticker suggestions are unavailable.");
         }
 
-        setPrimarySuggestions(payload.items ?? []);
+        setPrimarySuggestions({
+          startsWith: payload.startsWith ?? [],
+          contains: payload.contains ?? [],
+        });
         setSuggestionError(null);
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
-        setPrimarySuggestions([]);
+        setPrimarySuggestions(EMPTY_SUGGESTION_GROUPS);
         setSuggestionError(
           error instanceof Error
             ? error.message
@@ -934,7 +952,14 @@ export function RollingComparison({
   useEffect(() => {
     const query = comparisonTickerInput.trim();
     if (query.length === 0) {
-      setComparisonSuggestions([]);
+      setComparisonSuggestions(EMPTY_SUGGESTION_GROUPS);
+      setSuggestionError(null);
+      return;
+    }
+
+    if (query.length < MIN_TICKER_SUGGESTION_QUERY_LENGTH) {
+      setComparisonSuggestions(EMPTY_SUGGESTION_GROUPS);
+      setSuggestionError(null);
       return;
     }
 
@@ -950,7 +975,8 @@ export function RollingComparison({
           }
         );
         const payload = (await response.json()) as {
-          items?: TickerSuggestion[];
+          startsWith?: TickerSuggestion[];
+          contains?: TickerSuggestion[];
           error?: string;
         };
 
@@ -958,13 +984,16 @@ export function RollingComparison({
           throw new Error(payload.error || "Ticker suggestions are unavailable.");
         }
 
-        setComparisonSuggestions(payload.items ?? []);
+        setComparisonSuggestions({
+          startsWith: payload.startsWith ?? [],
+          contains: payload.contains ?? [],
+        });
         setSuggestionError(null);
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
-        setComparisonSuggestions([]);
+        setComparisonSuggestions(EMPTY_SUGGESTION_GROUPS);
         setSuggestionError(
           error instanceof Error
             ? error.message
@@ -1246,8 +1275,9 @@ export function RollingComparison({
                 (primaryTickerInput.trim().length > 0 ||
                   loadingSuggestionField === "primary") ? (
                   <TickerSuggestionList
-                    suggestions={primarySuggestions}
+                    groups={primarySuggestions}
                     loading={loadingSuggestionField === "primary"}
+                    query={primaryTickerInput}
                     onSelect={(suggestion) =>
                       applyTickerSuggestion("primary", suggestion)
                     }
@@ -1277,8 +1307,9 @@ export function RollingComparison({
                 (comparisonTickerInput.trim().length > 0 ||
                   loadingSuggestionField === "comparison") ? (
                   <TickerSuggestionList
-                    suggestions={comparisonSuggestions}
+                    groups={comparisonSuggestions}
                     loading={loadingSuggestionField === "comparison"}
+                    query={comparisonTickerInput}
                     onSelect={(suggestion) =>
                       applyTickerSuggestion("comparison", suggestion)
                     }
@@ -1905,49 +1936,91 @@ function ChartLegendPill({ label, color }: { label: string; color: string }) {
 }
 
 function TickerSuggestionList({
-  suggestions,
+  groups,
   loading,
+  query,
   onSelect,
 }: {
-  suggestions: TickerSuggestion[];
+  groups: TickerSuggestionGroups;
   loading: boolean;
+  query: string;
   onSelect: (suggestion: TickerSuggestion) => void;
 }) {
+  const normalizedQuery = query.trim().toUpperCase();
+  const hasAnySuggestions =
+    groups.startsWith.length > 0 || groups.contains.length > 0;
+
   return (
     <div className="absolute top-full left-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-[22px] border border-[rgba(23,32,51,0.12)] bg-[#fffdf8] p-2 shadow-[0_18px_40px_rgba(16,24,40,0.14)]">
       {loading ? (
         <div className="rounded-2xl px-3 py-3 text-xs font-medium text-[var(--muted-text)]">
-          Searching symbols...
+          티커 검색 중...
         </div>
-      ) : suggestions.length === 0 ? (
+      ) : normalizedQuery.length < MIN_TICKER_SUGGESTION_QUERY_LENGTH ? (
         <div className="rounded-2xl px-3 py-3 text-xs font-medium text-[var(--muted-text)]">
-          No matching symbols.
+          {MIN_TICKER_SUGGESTION_QUERY_LENGTH}글자 이상 입력해 주세요.
+        </div>
+      ) : !hasAnySuggestions ? (
+        <div className="rounded-2xl px-3 py-3 text-xs font-medium text-[var(--muted-text)]">
+          일치하는 티커가 없습니다.
         </div>
       ) : (
         <div className="grid gap-1">
-          {suggestions.map((suggestion) => (
-            <button
-              key={`${suggestion.symbol}-${suggestion.exchange}-${suggestion.asset}`}
-              type="button"
-              onClick={() => onSelect(suggestion)}
-              className="grid gap-0.5 rounded-2xl px-3 py-2 text-left transition hover:bg-[rgba(23,32,51,0.06)]"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-bold text-[var(--text)]">
-                  {suggestion.symbol}
-                </span>
-                <span className="text-[11px] font-semibold text-[var(--muted-text)]">
-                  {suggestion.exchange}
-                </span>
-              </div>
-              <div className="truncate text-[12px] font-medium text-[var(--muted-text)]">
-                {suggestion.name}
-              </div>
-            </button>
-          ))}
+          {groups.startsWith.length > 0 ? (
+            <SuggestionGroup
+              title={`${normalizedQuery}로 시작`}
+              suggestions={groups.startsWith}
+              onSelect={onSelect}
+            />
+          ) : null}
+          {groups.contains.length > 0 ? (
+            <SuggestionGroup
+              title={`${normalizedQuery} 포함`}
+              suggestions={groups.contains}
+              onSelect={onSelect}
+            />
+          ) : null}
         </div>
       )}
     </div>
+  );
+}
+
+function SuggestionGroup({
+  title,
+  suggestions,
+  onSelect,
+}: {
+  title: string;
+  suggestions: TickerSuggestion[];
+  onSelect: (suggestion: TickerSuggestion) => void;
+}) {
+  return (
+    <section className="grid gap-1">
+      <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--muted-text)]">
+        {title}
+      </div>
+      {suggestions.map((suggestion) => (
+        <button
+          key={`${suggestion.symbol}-${suggestion.exchange}-${suggestion.asset}`}
+          type="button"
+          onClick={() => onSelect(suggestion)}
+          className="grid gap-0.5 rounded-2xl px-3 py-2 text-left transition hover:bg-[rgba(23,32,51,0.06)]"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-bold text-[var(--text)]">
+              {suggestion.symbol}
+            </span>
+            <span className="text-[11px] font-semibold text-[var(--muted-text)]">
+              {suggestion.asset}
+            </span>
+          </div>
+          <div className="truncate text-[12px] font-medium text-[var(--muted-text)]">
+            {suggestion.name}
+          </div>
+        </button>
+      ))}
+    </section>
   );
 }
 
