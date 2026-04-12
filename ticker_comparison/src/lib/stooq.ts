@@ -1,6 +1,6 @@
 import { ChartPayload, TickerPayload, withDefaultSymbols } from "@/lib/chart-data";
 
-const STOOQ_URL = "https://stooq.com/q/d/l/";
+const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/";
 const NASDAQ_STOCK_SCREENER_URL =
   "https://api.nasdaq.com/api/screener/stocks?download=true";
 const NASDAQ_ETF_SCREENER_URL =
@@ -23,6 +23,10 @@ const NASDAQ_HEADERS = {
   origin: "https://www.nasdaq.com",
   referer: "https://www.nasdaq.com/",
 };
+const YAHOO_HEADERS = {
+  "user-agent": "Mozilla/5.0 ticker-comparison/1.0",
+  accept: "application/json",
+};
 
 export interface TickerSuggestion {
   symbol: string;
@@ -34,6 +38,23 @@ export interface TickerSuggestion {
 export interface TickerSuggestionGroups {
   startsWith: TickerSuggestion[];
   contains: TickerSuggestion[];
+}
+
+interface YahooChartResponse {
+  chart?: {
+    result?: Array<{
+      timestamp?: number[];
+      indicators?: {
+        adjclose?: Array<{
+          adjclose?: Array<number | null>;
+        }>;
+      };
+    }>;
+    error?: {
+      code?: string;
+      description?: string;
+    } | null;
+  };
 }
 
 export function normalizeTickerInput(value: string): string | null {
@@ -55,7 +76,7 @@ export async function fetchPairHistory(
 
   return withDefaultSymbols({
     generatedAt: new Date().toISOString(),
-    source: "stooq",
+    source: "yahoo-finance",
     symbols: {
       QQQ: primarySymbol,
       TQQQ: comparisonSymbol,
@@ -108,23 +129,31 @@ export async function fetchTickerSuggestions(
 }
 
 async function fetchHistory(ticker: string): Promise<TickerPayload> {
-  const url = new URL(STOOQ_URL);
-  url.searchParams.set("s", `${ticker.toLowerCase()}.us`);
-  url.searchParams.set("i", "d");
+  const url = new URL(`${YAHOO_CHART_URL}${ticker}`);
+  url.searchParams.set("period1", "0");
+  url.searchParams.set(
+    "period2",
+    String(Math.floor(Date.now() / 1000) + 24 * 60 * 60)
+  );
+  url.searchParams.set("interval", "1d");
+  url.searchParams.set("includeAdjustedClose", "true");
 
   const response = await fetch(url, {
     cache: "no-store",
-    headers: {
-      "user-agent": "ticker-comparison/1.0",
-    },
+    headers: YAHOO_HEADERS,
   });
+  const payload = (await response.json()) as YahooChartResponse;
+  const chartError = payload.chart?.error;
 
-  if (!response.ok) {
-    throw new Error(`${ticker} 데이터를 가져오지 못했습니다.`);
+  if (!response.ok || chartError) {
+    const message =
+      chartError?.description ||
+      chartError?.code ||
+      `${ticker} 데이터를 가져오지 못했습니다.`;
+    throw new Error(message);
   }
 
-  const rawCsv = await response.text();
-  const rows = parseStooqCsv(rawCsv);
+  const rows = parseYahooRows(payload);
 
   if (rows.length === 0) {
     throw new Error(`${ticker} 데이터가 비어 있습니다.`);
@@ -138,43 +167,25 @@ async function fetchHistory(ticker: string): Promise<TickerPayload> {
   };
 }
 
-function parseStooqCsv(rawCsv: string): Array<[string, number]> {
-  const [headerLine, ...dataLines] = rawCsv
-    .trim()
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/);
+function parseYahooRows(payload: YahooChartResponse): Array<[string, number]> {
+  const result = payload.chart?.result?.[0];
+  const timestamps = result?.timestamp ?? [];
+  const adjustedCloses = result?.indicators?.adjclose?.[0]?.adjclose ?? [];
 
-  if (!headerLine) {
-    return [];
-  }
-
-  const headers = headerLine.split(",");
-  const dateIndex = headers.indexOf("Date");
-  const closeIndex = headers.indexOf("Close");
-
-  if (dateIndex < 0 || closeIndex < 0) {
+  if (timestamps.length === 0 || adjustedCloses.length === 0) {
     return [];
   }
 
   const rows: Array<[string, number]> = [];
-  for (const line of dataLines) {
-    if (!line.trim()) {
+  for (let index = 0; index < timestamps.length; index += 1) {
+    const timestamp = timestamps[index];
+    const close = adjustedCloses[index];
+
+    if (typeof timestamp !== "number" || typeof close !== "number") {
       continue;
     }
 
-    const columns = line.split(",");
-    const date = columns[dateIndex]?.trim();
-    const closeValue = columns[closeIndex]?.trim();
-
-    if (!date || !closeValue || closeValue.toLowerCase() === "nan") {
-      continue;
-    }
-
-    const close = Number(closeValue);
-    if (!Number.isFinite(close)) {
-      continue;
-    }
-
+    const date = new Date(timestamp * 1000).toISOString().slice(0, 10);
     rows.push([date, Number(close.toFixed(6))]);
   }
 

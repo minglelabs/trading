@@ -5,34 +5,71 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import urlopen
-
-import pandas as pd
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = ROOT / "public" / "chart-data.json"
 TICKERS = ("QQQ", "TQQQ")
-STOOQ_URL = "https://stooq.com/q/d/l/?s={symbol}.us&i=d"
+YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 ticker-comparison/1.0",
+}
 
 
 def fetch_history(ticker: str) -> dict[str, object]:
-    with urlopen(STOOQ_URL.format(symbol=ticker.lower())) as response:
-        history = pd.read_csv(response)
+    params = urlencode(
+        {
+            "period1": 0,
+            "period2": int(datetime.now(timezone.utc).timestamp()) + 86400,
+            "interval": "1d",
+            "includeAdjustedClose": "true",
+        }
+    )
+    request = Request(
+        f"{YAHOO_CHART_URL.format(symbol=ticker)}?{params}",
+        headers=REQUEST_HEADERS,
+    )
 
-    if history.empty:
+    with urlopen(request) as response:
+        payload = json.load(response)
+
+    chart = payload.get("chart") or {}
+    error = chart.get("error")
+    if error:
+        message = error.get("description") or error.get("code") or "unknown error"
+        raise RuntimeError(f"{ticker} data download failed: {message}")
+
+    result = (chart.get("result") or [None])[0]
+    if not result:
         raise RuntimeError(f"{ticker} data download returned no rows")
 
-    history["Date"] = pd.to_datetime(history["Date"], utc=True).dt.strftime("%Y-%m-%d")
+    timestamps = result.get("timestamp") or []
+    indicators = result.get("indicators") or {}
+    adjusted_close_sets = indicators.get("adjclose") or []
+    adjusted_closes = (
+        adjusted_close_sets[0].get("adjclose")
+        if adjusted_close_sets and adjusted_close_sets[0]
+        else []
+    )
+
+    if not timestamps or not adjusted_closes:
+        raise RuntimeError(f"{ticker} data download returned no rows")
 
     rows: list[list[object]] = []
-    for row in history.itertuples(index=False):
-        close = row.Close
-        if close is None or pd.isna(close):
+    for timestamp, close in zip(timestamps, adjusted_closes):
+        if close is None:
             continue
-        rows.append([row.Date, round(float(close), 6)])
+
+        date_key = datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime(
+            "%Y-%m-%d"
+        )
+        rows.append([date_key, round(float(close), 6)])
 
     if not rows:
-        raise RuntimeError(f"{ticker} data download returned no valid adjusted close rows")
+        raise RuntimeError(
+            f"{ticker} data download returned no valid adjusted close rows"
+        )
 
     return {
         "rows": rows,
@@ -46,7 +83,7 @@ def main() -> None:
     tickers = {ticker: fetch_history(ticker) for ticker in TICKERS}
     payload = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "source": "stooq",
+        "source": "yahoo-finance",
         "symbols": {
             "QQQ": "QQQ",
             "TQQQ": "TQQQ",

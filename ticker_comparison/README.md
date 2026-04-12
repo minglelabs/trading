@@ -25,10 +25,9 @@ Required:
 Optional:
 
 - `Python 3`
-- `pandas`
 
-`Python 3` and `pandas` are not required just to run the app.
-They are only needed if you want to regenerate the default local data file at [`public/chart-data.json`](public/chart-data.json).
+`Python 3` is not required just to run the app.
+It is only needed if you want to regenerate the default local data file at [`public/chart-data.json`](public/chart-data.json).
 
 ## Easiest Option: Ask Codex To Run It
 
@@ -124,7 +123,7 @@ npm run start
 npm run refresh:data
 ```
 
-This command downloads long-range daily data from `Stooq` and rebuilds [`public/chart-data.json`](public/chart-data.json).
+This command downloads long-range daily adjusted-close data from Yahoo Finance and rebuilds [`public/chart-data.json`](public/chart-data.json).
 
 Notes:
 
@@ -136,19 +135,17 @@ Notes:
 
 If `npm run refresh:data` works in your environment, use that.
 
-If you get a `python` or `pandas` error, use one of the platform-specific commands below.
+If you get a `python` error, use one of the platform-specific commands below.
 
 ### macOS / Linux
 
 ```bash
-python3 -m pip install pandas
 python3 refresh_data.py
 ```
 
 ### Windows PowerShell
 
 ```powershell
-py -3 -m pip install pandas
 py -3 refresh_data.py
 ```
 
@@ -178,7 +175,7 @@ If your server started on `3001`, change the port in the URL accordingly.
 This project does not require a `.env` file.
 It does require outbound access to these services while the server is running:
 
-- `stooq.com`
+- `query1.finance.yahoo.com`
 - `api.nasdaq.com`
 
 This matters for:
@@ -216,22 +213,22 @@ This usually means another `next dev` instance is already running for the same p
 ### The page loads but ticker search or history does not work
 
 This is usually an outbound network-access problem.
-Make sure access to `stooq.com` and `api.nasdaq.com` is not blocked.
+Make sure access to `query1.finance.yahoo.com` and `api.nasdaq.com` is not blocked.
 
-### `npm run refresh:data` fails with a `pandas` error
+### `npm run refresh:data` fails with a `python` error
 
-Install `pandas` using the command for your platform.
+Run the script directly with an explicit Python 3 command for your platform.
 
 macOS / Linux:
 
 ```bash
-python3 -m pip install pandas
+python3 refresh_data.py
 ```
 
 Windows PowerShell:
 
 ```powershell
-py -3 -m pip install pandas
+py -3 refresh_data.py
 ```
 
 ## Useful Codex Prompts
